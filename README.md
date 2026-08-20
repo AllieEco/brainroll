@@ -1,100 +1,133 @@
-# vinext-starter
+<div align="center">
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+![Brainroll — Roll. Research. Present.](public/og.png)
 
-## Prerequisites
+# BRAINROLL
 
-- Node.js `>=22.13.0`
+### Roll. Research. Present.
 
-## Quick Start
+**Un jeu web de speedrun culturel : tire un sujet au hasard, apprends tout ce que tu peux en une heure, puis défends ce que tu as compris.**
+
+[Aperçu privé](https://brainroll.allison-bon-ecochard.chatgpt.site) · [Signaler un problème](https://github.com/AllieEco/brainroll/issues)
+
+</div>
+
+---
+
+## Le concept
+
+Brainroll transforme la recherche documentaire en défi chronométré.
+
+1. **ROLL** — lance les dés et découvre un sujet inattendu ;
+2. **RESEARCH** — cherche, collecte tes sources et prends des notes ;
+3. **UNDERSTAND** — organise tes idées et crée des flashcards ;
+4. **BUILD** — construis ta présentation avant la fin du chrono ;
+5. **PRESENT** — à `00:00`, tout est verrouillé : il faut présenter ce que tu sais.
+
+> Aujourd'hui, tu vas devenir temporairement expert d'un sujet dont tu ne savais absolument rien il y a une heure.
+
+Brainroll est pensé d'abord comme un **jeu**, notamment pour les streamers et leur audience. Il peut également être utilisé seul, entre amis, en classe ou dans un cadre pédagogique.
+
+## Fonctionnalités actuelles
+
+- tirage animé parmi une base locale de sujets ;
+- catégories, niveaux de difficulté et contraintes aléatoires ;
+- chrono persistant de 60 minutes ;
+- verrouillage automatique basé sur l'heure réelle de fin ;
+- autosauvegarde locale de la session ;
+- éditeur de notes ;
+- collection de sources ;
+- création de flashcards ;
+- carte mentale avec nœuds déplaçables et colorables ;
+- export de la carte mentale en PNG ;
+- insertion directe d'une carte mentale dans les slides ;
+- éditeur de slides avec couleurs, images et plusieurs formats ;
+- mode présentation plein écran avec navigation clavier ;
+- abandon de partie protégé par une confirmation.
+
+## Lancer Brainroll en local
+
+### Prérequis
+
+- Node.js `>= 22.13.0`
+- npm
+
+### Installation
 
 ```bash
+git clone https://github.com/AllieEco/brainroll.git
+cd brainroll
 npm install
 npm run dev
+```
+
+Ouvre ensuite [http://localhost:3000](http://localhost:3000).
+
+### Vérifier la version de production
+
+```bash
 npm run build
 ```
 
-This starter does not use `wrangler.jsonc`.
+## Stack
 
-## Included Shape
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- vinext / Vite
+- Cloudflare Workers via OpenAI Sites
+- `localStorage` pour la persistance du MVP
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+## Données et confidentialité
 
-## Workspace Auth Headers
+Le MVP ne nécessite aucun compte et n'envoie pas le contenu des sessions vers une base de données. Les notes, sources, flashcards, cartes mentales et slides sont conservées dans le stockage local du navigateur.
 
-Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.
+Les images ajoutées aux slides sont limitées à environ 2,5 Mo afin de ne pas saturer ce stockage.
 
-The user ID is stable for the same user on the same Site and different across Sites. Email and name are intended for display or contact purposes.
+## Structure du projet
 
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get("oai-authenticated-user-id");
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```text
+app/
+├── page.tsx        # boucle de jeu et workspace
+├── globals.css     # direction visuelle et responsive
+└── layout.tsx      # métadonnées du site
+public/
+└── og.png          # carte de partage Brainroll
+worker/
+└── index.ts        # point d'entrée Cloudflare
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+## Contrôles de présentation
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+| Touche | Action |
+| --- | --- |
+| `→` ou `Espace` | Slide suivante |
+| `←` | Slide précédente |
+| `Échap` | Quitter la présentation |
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+## Roadmap
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+- [ ] bibliothèque de sujets plus large ;
+- [ ] durées et modes de jeu alternatifs ;
+- [ ] véritable éditeur de slides libre ;
+- [ ] export PDF et PPTX ;
+- [ ] Audience Mode pour le streaming ;
+- [ ] sessions partagées et mode duel ;
+- [ ] historique, statistiques et achievements ;
+- [ ] sauvegarde optionnelle dans le cloud.
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+## État du projet
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+Brainroll est actuellement un **MVP jouable**. Son objectif est de valider une question simple :
 
-## Useful Commands
+> Est-ce que faire un Brainroll est réellement amusant ?
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+Les retours, idées et rapports de bugs sont les bienvenus dans les [issues GitHub](https://github.com/AllieEco/brainroll/issues).
 
-## Learn More
+---
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+<div align="center">
+
+**Less brainrot. More brain.**
+
+</div>
