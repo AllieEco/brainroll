@@ -1,6 +1,6 @@
 <div align="center">
 
-![Brainroll — Roll. Research. Present.](public/og.png)
+![Brainroll — Roll. Research. Present.](public/brainroll-cover-v2.png)
 
 # BRAINROLL
 
@@ -92,7 +92,7 @@ app/
 ├── globals.css     # direction visuelle et responsive
 └── layout.tsx      # métadonnées du site
 public/
-└── og.png          # carte de partage Brainroll
+└── brainroll-cover-v2.png  # carte de partage Brainroll
 worker/
 └── index.ts        # point d'entrée Cloudflare
 ```
