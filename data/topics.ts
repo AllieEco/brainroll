@@ -1,4 +1,5 @@
 import { artists, getArtistConstraint } from "./artists";
+import { artMovements, getArtMovementConstraint } from "./art-movements";
 
 export type Topic = {
   category: string;
@@ -245,6 +246,14 @@ const artistTopics: Topic[] = artists.map(({ title, region, difficulty }, index)
   accent: "#ff8ec7",
 }));
 
+const artMovementTopics: Topic[] = artMovements.map(({ title, difficulty }, index) => ({
+  category: "ART",
+  title,
+  difficulty,
+  constraint: getArtMovementConstraint(index),
+  accent: "#ffca45",
+}));
+
 export const topics: Topic[] = [
   { category: "HISTOIRE", title: "La révolte des Taiping", difficulty: 4, constraint: "Ta présentation doit contenir une carte.", accent: "#ff5b35" },
   { category: "SCIENCES", title: "Les lichens", difficulty: 3, constraint: "Explique le sujet sans utiliser de jargon.", accent: "#55b9ff" },
@@ -257,4 +266,5 @@ export const topics: Topic[] = [
   { category: "CIVILISATIONS", title: "Le royaume d’Aksoum", difficulty: 4, constraint: "Compare deux interprétations historiques.", accent: "#c19cff" },
   ...literatureTopics,
   ...artistTopics,
+  ...artMovementTopics,
 ];
