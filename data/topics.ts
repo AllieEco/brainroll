@@ -1,5 +1,6 @@
 import { artists, getArtistConstraint } from "./artists";
 import { artMovements, getArtMovementConstraint } from "./art-movements";
+import { getPhilosophyConstraint, philosophyMovements } from "./philosophy-movements";
 
 export type Topic = {
   category: string;
@@ -254,6 +255,14 @@ const artMovementTopics: Topic[] = artMovements.map(({ title, difficulty }, inde
   accent: "#ffca45",
 }));
 
+const philosophyTopics: Topic[] = philosophyMovements.map(({ title, difficulty }, index) => ({
+  category: "PHILOSOPHIE",
+  title,
+  difficulty,
+  constraint: getPhilosophyConstraint(index),
+  accent: "#8ed6a8",
+}));
+
 export const topics: Topic[] = [
   { category: "HISTOIRE", title: "La révolte des Taiping", difficulty: 4, constraint: "Ta présentation doit contenir une carte.", accent: "#ff5b35" },
   { category: "SCIENCES", title: "Les lichens", difficulty: 3, constraint: "Explique le sujet sans utiliser de jargon.", accent: "#55b9ff" },
@@ -267,4 +276,5 @@ export const topics: Topic[] = [
   ...literatureTopics,
   ...artistTopics,
   ...artMovementTopics,
+  ...philosophyTopics,
 ];
