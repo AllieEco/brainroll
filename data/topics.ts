@@ -19,6 +19,8 @@ import { getScientificTopicConstraint, scientificTopics } from "./scientific-top
 import { getMythologyConstraint, mythologyTopics } from "./mythology";
 import { cuisineTopics, getCuisineConstraint } from "./cuisine";
 import { culinaryFigures, getCulinaryFigureConstraint } from "./culinary-figures";
+import { cinemaTopics, getCinemaConstraint } from "./cinema";
+import { getMusicConstraint, musicTopics } from "./music";
 
 export type Topic = {
   category: string;
@@ -425,6 +427,22 @@ const culinaryFigureTopics: Topic[] = culinaryFigures.map(({ title, difficulty }
   accent: "#ffca45",
 }));
 
+const filmTopics: Topic[] = cinemaTopics.map(({ title, difficulty, kind }, index) => ({
+  category: "CINÉMA",
+  title,
+  difficulty,
+  constraint: getCinemaConstraint(index, kind),
+  accent: "#ff5b35",
+}));
+
+const musicalTopics: Topic[] = musicTopics.map(({ title, difficulty, kind }, index) => ({
+  category: "MUSIQUE",
+  title,
+  difficulty,
+  constraint: getMusicConstraint(index, kind),
+  accent: "#c19cff",
+}));
+
 export const topics: Topic[] = [
   { category: "HISTOIRE", title: "La révolte des Taiping", difficulty: 4, constraint: "Ta présentation doit contenir une carte.", accent: "#ff5b35" },
   { category: "SCIENCES", title: "Les lichens", difficulty: 3, constraint: "Explique le sujet sans utiliser de jargon.", accent: "#55b9ff" },
@@ -457,4 +475,6 @@ export const topics: Topic[] = [
   ...mythTopics,
   ...culinaryTopics,
   ...culinaryFigureTopics,
+  ...filmTopics,
+  ...musicalTopics,
 ];
