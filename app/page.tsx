@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { topics, type Topic } from "../data/topics";
 
 type Source = { id: string; title: string; url: string };
 type Card = { id: string; front: string; back: string };
-type Slide = { id: string; title: string; body: string; background?: string; color?: string; image?: string; layout?: "impact" | "canvas" };
+type SlideBlock = "title" | "body" | "image";
+type BlockPosition = { x: number; y: number; width: number };
+type Slide = { id: string; title: string; body: string; background?: string; color?: string; image?: string; layout?: "impact" | "canvas"; positions?: Partial<Record<SlideBlock, BlockPosition>> };
 type MindNode = { id: string; text: string; x: number; y: number; color: string };
 type GameMode = "classic" | "fast";
 type Session = {
@@ -31,6 +33,20 @@ const MODE_CONFIG = {
 const uid = () => Math.random().toString(36).slice(2, 9);
 const freshSlide = (n = 1): Slide => ({ id: uid(), title: n === 1 ? "Titre de la présentation" : `Slide ${n}`, body: n === 1 ? "Une phrase qui donne envie d’écouter la suite." : "Ajoute ton idée essentielle ici.", background: "#f2efe6", color: "#191815", layout: "impact" });
 const formatTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+const BLOCK_PRESETS: Record<"impact" | "canvas", Record<SlideBlock, BlockPosition>> = {
+  impact: { title: { x: 8, y: 25, width: 78 }, body: { x: 8, y: 58, width: 62 }, image: { x: 63, y: 18, width: 30 } },
+  canvas: { title: { x: 7, y: 23, width: 50 }, body: { x: 7, y: 58, width: 48 }, image: { x: 62, y: 18, width: 31 } },
+};
+const plainText = (value: string) => value.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+function sanitizeRichText(value: string) {
+  return value
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<span\b[^>]*style=["'][^"']*background(?:-color)?\s*:[^"']*["'][^>]*>/gi, "<mark>")
+    .replace(/<\/span>/gi, "</mark>")
+    .replace(/<(?!\/?(?:b|strong|u|mark|br|div|p)(?:\s|>|\/))[^>]*>/gi, "")
+    .replace(/<(b|strong|u|mark|br|div|p)\b[^>]*>/gi, "<$1>");
+}
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -176,16 +192,15 @@ export default function Home() {
 
   if (screen === "present" && session) {
     const slide = session.slides[presentIndex] ?? session.slides[0];
+    const preset = BLOCK_PRESETS[slide.layout ?? "impact"];
     return (
       <main className="presentation" style={{ "--topic-accent": session.topic.accent } as React.CSSProperties}>
         <div className="present-top"><span>⚄ BRAINROLL</span><span>{presentIndex + 1} / {session.slides.length}</span></div>
-        <section className={`present-slide ${slide.layout === "canvas" ? "canvas-layout" : ""}`} style={{ background: slide.background ?? "#f2efe6", color: slide.color ?? "#191815" }}>
-          {slide.image && <img src={slide.image} alt="Visuel de la slide" />}
-          <div className="present-copy">
+        <section className="present-slide freeform-slide" style={{ background: slide.background ?? "#f2efe6", color: slide.color ?? "#191815" }}>
           <span className="slide-kicker">{session.topic.category} · {session.topic.title}</span>
-          <h1>{slide.title}</h1>
-          <p>{slide.body}</p>
-          </div>
+          <div className="present-block present-title" style={blockStyle(slide.positions?.title ?? preset.title)} dangerouslySetInnerHTML={{ __html: sanitizeRichText(slide.title) }} />
+          <div className="present-block present-body" style={blockStyle(slide.positions?.body ?? preset.body)} dangerouslySetInnerHTML={{ __html: sanitizeRichText(slide.body) }} />
+          {slide.image && <div className="present-block present-image" style={blockStyle(slide.positions?.image ?? preset.image)}><img src={slide.image} alt="Visuel de la slide" /></div>}
         </section>
         <div className="present-controls">
           <button aria-label="Slide précédente" onClick={() => setPresentIndex(Math.max(0, presentIndex - 1))}>←</button>
@@ -288,19 +303,21 @@ export default function Home() {
               {tab === "slides" && (
                 <Panel title="Slides" eyebrow="BUILD THE STORY" count={`${session.slides.length} SLIDES`}>
                   <div className="slides-editor">
-                    <div className="slide-list">{session.slides.map((slide, i) => <button className={i === slideIndex ? "active" : ""} key={slide.id} onClick={() => setSlideIndex(i)}><span>{String(i + 1).padStart(2, "0")}</span><b>{slide.title || "Sans titre"}</b></button>)}<button className="add-slide" onClick={addSlide}>+ ADD SLIDE</button></div>
+                    <div className="slide-list">{session.slides.map((slide, i) => <button className={i === slideIndex ? "active" : ""} key={slide.id} onClick={() => setSlideIndex(i)}><span>{String(i + 1).padStart(2, "0")}</span><b>{plainText(slide.title) || "Sans titre"}</b></button>)}<button className="add-slide" onClick={addSlide}>+ ADD SLIDE</button></div>
                     <div className="slide-stage">
                       <div className="slide-customize">
                         <label>FOND <input type="color" value={session.slides[slideIndex]?.background ?? "#f2efe6"} onChange={(e) => updateSlide({ background: e.target.value })} /></label>
                         <label>TEXTE <input type="color" value={session.slides[slideIndex]?.color ?? "#191815"} onChange={(e) => updateSlide({ color: e.target.value })} /></label>
-                        <button className={session.slides[slideIndex]?.layout !== "canvas" ? "active" : ""} onClick={() => updateSlide({ layout: "impact" })}>IMPACT</button>
-                        <button className={session.slides[slideIndex]?.layout === "canvas" ? "active" : ""} onClick={() => updateSlide({ layout: "canvas" })}>CANVAS + IMAGE</button>
+                        <button className={session.slides[slideIndex]?.layout !== "canvas" ? "active" : ""} onClick={() => updateSlide({ layout: "impact", positions: BLOCK_PRESETS.impact })}>IMPACT</button>
+                        <button className={session.slides[slideIndex]?.layout === "canvas" ? "active" : ""} onClick={() => updateSlide({ layout: "canvas", positions: BLOCK_PRESETS.canvas })}>CANVAS + IMAGE</button>
+                        <span className="format-divider" />
+                        <button className="format-button" title="Gras" aria-label="Mettre le texte sélectionné en gras" onMouseDown={(e) => { e.preventDefault(); document.execCommand("bold"); }}><b>B</b></button>
+                        <button className="format-button" title="Souligné" aria-label="Souligner le texte sélectionné" onMouseDown={(e) => { e.preventDefault(); document.execCommand("underline"); }}><u>U</u></button>
+                        <button className="format-button highlight" title="Surligner" aria-label="Surligner le texte sélectionné" onMouseDown={(e) => { e.preventDefault(); document.execCommand("hiliteColor", false, "#fff176"); }}><mark>A</mark></button>
                         <label className="image-upload">+ IMAGE<input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && addImageToSlide(e.target.files[0])} /></label>
                       </div>
-                      <div className={`mini-slide ${session.slides[slideIndex]?.layout === "canvas" ? "canvas-layout" : ""}`} style={{ background: session.slides[slideIndex]?.background, color: session.slides[slideIndex]?.color }}>
-                        {session.slides[slideIndex]?.image && <div className="slide-image"><img src={session.slides[slideIndex].image} alt="Visuel ajouté" /><button aria-label="Retirer l’image" onClick={() => updateSlide({ image: undefined })}>×</button></div>}
-                        <div className="slide-copy"><span>{session.topic.category}</span><input aria-label="Titre de la slide" value={session.slides[slideIndex]?.title ?? ""} onChange={(e) => updateSlide({ title: e.target.value })} /><textarea aria-label="Contenu de la slide" value={session.slides[slideIndex]?.body ?? ""} onChange={(e) => updateSlide({ body: e.target.value })} /></div><i>{String(slideIndex + 1).padStart(2, "0")}</i>
-                      </div>
+                      <p className="slide-editor-hint">Sélectionne du texte pour le formater · Attrape les poignées pour déplacer les blocs</p>
+                      <SlideCanvas slide={session.slides[slideIndex]} topic={session.topic} index={slideIndex} onChange={updateSlide} />
                       <div className="slide-tools"><button onClick={deleteSlide} disabled={session.slides.length === 1}>SUPPRIMER</button><button onClick={() => { setPresentIndex(0); setScreen("present"); }}>PRÉSENTER ↗</button></div>
                     </div>
                   </div>
@@ -314,6 +331,70 @@ export default function Home() {
       {confirmAbandon && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="abandon-title"><div className="confirm-modal"><span>⚠ DANGER ZONE</span><h2 id="abandon-title">Abandonner la partie ?</h2><p>Le chrono s’arrêtera et toutes les notes, sources, cartes et slides de cette session seront supprimées.</p><div><button className="secondary" onClick={() => setConfirmAbandon(false)}>CONTINUER LA PARTIE</button><button className="danger" onClick={abandonSession}>OUI, ABANDONNER</button></div></div></div>}
     </main>
   );
+}
+
+function blockStyle(position: BlockPosition): React.CSSProperties {
+  return { left: `${position.x}%`, top: `${position.y}%`, width: `${position.width}%` };
+}
+
+function SlideCanvas({ slide, topic, index, onChange }: { slide: Slide; topic: Topic; index: number; onChange: (patch: Partial<Slide>) => void }) {
+  const boardRef = useRef<HTMLDivElement>(null);
+  const preset = BLOCK_PRESETS[slide.layout ?? "impact"];
+  const [drag, setDrag] = useState<{ block: SlideBlock; startX: number; startY: number; origin: BlockPosition } | null>(null);
+  const positionFor = (block: SlideBlock) => slide.positions?.[block] ?? preset[block];
+
+  function startDrag(event: React.PointerEvent<HTMLButtonElement>, block: SlideBlock) {
+    if (!boardRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDrag({ block, startX: event.clientX, startY: event.clientY, origin: positionFor(block) });
+  }
+
+  function moveDrag(event: React.PointerEvent<HTMLButtonElement>) {
+    if (!drag || !boardRef.current) return;
+    const rect = boardRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(100 - drag.origin.width, drag.origin.x + ((event.clientX - drag.startX) / rect.width) * 100));
+    const y = Math.max(0, Math.min(88, drag.origin.y + ((event.clientY - drag.startY) / rect.height) * 100));
+    onChange({ positions: { ...slide.positions, [drag.block]: { ...drag.origin, x, y } } });
+  }
+
+  const handle = (block: SlideBlock, label: string) => (
+    <button className="block-handle" aria-label={`Déplacer ${label}`} title={`Déplacer ${label}`} onPointerDown={(event) => startDrag(event, block)} onPointerMove={moveDrag} onPointerUp={() => setDrag(null)} onPointerCancel={() => setDrag(null)}>⠿</button>
+  );
+
+  return (
+    <div ref={boardRef} className="mini-slide freeform-editor" style={{ background: slide.background, color: slide.color }}>
+      <span className="slide-kicker editor-kicker">{topic.category}</span>
+      <div className="editable-block title-block" style={blockStyle(positionFor("title"))}>
+        {handle("title", "le titre")}
+        <RichTextEditor className="slide-title-editor" label="Titre de la slide" value={slide.title} onChange={(title) => onChange({ title })} />
+      </div>
+      <div className="editable-block body-block" style={blockStyle(positionFor("body"))}>
+        {handle("body", "le texte")}
+        <RichTextEditor className="slide-body-editor" label="Contenu de la slide" value={slide.body} onChange={(body) => onChange({ body })} />
+      </div>
+      {slide.image && (
+        <div className="editable-block image-block" style={blockStyle(positionFor("image"))}>
+          {handle("image", "l’image")}
+          <img src={slide.image} alt="Visuel ajouté" />
+          <button className="remove-slide-image" aria-label="Retirer l’image" onClick={() => onChange({ image: undefined })}>×</button>
+        </div>
+      )}
+      <i>{String(index + 1).padStart(2, "0")}</i>
+    </div>
+  );
+}
+
+function RichTextEditor({ value, onChange, className, label }: { value: string; onChange: (value: string) => void; className: string; label: string }) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const safeValue = sanitizeRichText(value);
+
+  useEffect(() => {
+    if (editorRef.current && document.activeElement !== editorRef.current && editorRef.current.innerHTML !== safeValue) editorRef.current.innerHTML = safeValue;
+  }, [safeValue]);
+
+  return <div ref={editorRef} className={className} role="textbox" aria-label={label} aria-multiline="true" contentEditable suppressContentEditableWarning onInput={(event) => onChange(sanitizeRichText(event.currentTarget.innerHTML))} onBlur={(event) => { const clean = sanitizeRichText(event.currentTarget.innerHTML); event.currentTarget.innerHTML = clean; onChange(clean); }} />;
 }
 
 function Panel({ title, eyebrow, count, children }: { title: string; eyebrow: string; count: string; children: React.ReactNode }) {
