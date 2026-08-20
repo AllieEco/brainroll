@@ -1,0 +1,70 @@
+export type PhilosopherSeed = {
+  title: string;
+  difficulty: number;
+};
+
+export const philosopherConstraints = [
+  "Présente trois concepts majeurs et relie-les par une carte conceptuelle.",
+  "Reconstruis un argument de cette personne en prémisses et conclusion.",
+  "Intègre un court extrait correctement attribué, puis reformule-le en langage courant.",
+  "Compare sa réponse à un problème avec celle d’un autre philosophe.",
+  "Présente une objection forte à sa pensée et une réponse possible à cette objection.",
+  "Applique un concept à une situation contemporaine en précisant les limites de l’analogie.",
+  "Distingue ce que cette personne affirme de ce que ses commentateurs lui attribuent.",
+  "Construis une chronologie de cinq dates maximum reliant sa vie, ses textes et son époque.",
+  "Explique un concept sans employer de terme technique non défini.",
+  "Montre comment son contexte politique, religieux ou scientifique a influencé sa pensée.",
+  "Compare deux interprétations documentées d’un de ses textes.",
+  "Consacre une slide à une contradiction apparente ou à une évolution de sa pensée.",
+  "Présente l’influence de ses idées dans deux traditions intellectuelles ou régions différentes.",
+  "Transforme une de ses thèses en expérience de pensée illustrée.",
+  "Explique un désaccord célèbre sans désigner artificiellement un vainqueur.",
+  "Termine par une question philosophique ouverte directement inspirée de ses travaux.",
+] as const;
+
+export const getPhilosopherConstraint = (index: number) =>
+  philosopherConstraints[index % philosopherConstraints.length];
+
+export const philosophers: PhilosopherSeed[] = [
+  { title: "Socrate", difficulty: 1 },
+  { title: "Platon", difficulty: 1 },
+  { title: "Épicure", difficulty: 2 },
+  { title: "Zénon de Kition", difficulty: 3 },
+  { title: "Épictète", difficulty: 2 },
+  { title: "Sénèque", difficulty: 2 },
+  { title: "Marc Aurèle", difficulty: 1 },
+  { title: "Pyrrhon d’Élis", difficulty: 3 },
+  { title: "Plotin", difficulty: 4 },
+  { title: "Confucius", difficulty: 1 },
+  { title: "Laozi", difficulty: 2 },
+  { title: "Zhuangzi", difficulty: 3 },
+  { title: "Mozi", difficulty: 4 },
+  { title: "Mencius", difficulty: 3 },
+  { title: "Han Feizi", difficulty: 3 },
+  { title: "Nāgārjuna", difficulty: 5 },
+  { title: "Śaṅkara", difficulty: 4 },
+  { title: "Ramanuja", difficulty: 4 },
+  { title: "Mahavira", difficulty: 3 },
+  { title: "Averroès", difficulty: 3 },
+  { title: "Al-Farabi", difficulty: 4 },
+  { title: "Al-Ghazali", difficulty: 4 },
+  { title: "Ibn Khaldoun", difficulty: 3 },
+  { title: "Maïmonide", difficulty: 3 },
+  { title: "René Descartes", difficulty: 1 },
+  { title: "Baruch Spinoza", difficulty: 2 },
+  { title: "Thomas Hobbes", difficulty: 2 },
+  { title: "John Locke", difficulty: 2 },
+  { title: "David Hume", difficulty: 2 },
+  { title: "Jean-Jacques Rousseau", difficulty: 1 },
+  { title: "Immanuel Kant", difficulty: 4 },
+  { title: "Georg Wilhelm Friedrich Hegel", difficulty: 5 },
+  { title: "Søren Kierkegaard", difficulty: 3 },
+  { title: "Friedrich Nietzsche", difficulty: 2 },
+  { title: "John Stuart Mill", difficulty: 2 },
+  { title: "Hannah Arendt", difficulty: 2 },
+  { title: "Simone Weil", difficulty: 3 },
+  { title: "Frantz Fanon", difficulty: 2 },
+  { title: "Kwasi Wiredu", difficulty: 4 },
+  { title: "Enrique Dussel", difficulty: 4 },
+  { title: "Achille Mbembe", difficulty: 3 },
+];

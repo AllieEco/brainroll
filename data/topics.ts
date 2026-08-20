@@ -9,6 +9,8 @@ import { getInternetFigureConstraint, internetFigures } from "./internet-figures
 import { getInternetTopicConstraint, internetTopics } from "./internet-topics";
 import { getHistoricalPeriodConstraint, historicalPeriods } from "./historical-periods";
 import { getReligiousMovementConstraint, religiousMovements } from "./religious-movements";
+import { getSocialScienceThinkerConstraint, socialScienceThinkers } from "./social-science-thinkers";
+import { getPhilosopherConstraint, philosophers } from "./philosophers";
 
 export type Topic = {
   category: string;
@@ -335,6 +337,22 @@ const religiousMovementTopics: Topic[] = religiousMovements.map(({ title, diffic
   accent: "#c19cff",
 }));
 
+const socialScienceThinkerTopics: Topic[] = socialScienceThinkers.map(({ title, difficulty }, index) => ({
+  category: "SCIENCES SOCIALES",
+  title,
+  difficulty,
+  constraint: getSocialScienceThinkerConstraint(index),
+  accent: "#55b9ff",
+}));
+
+const philosopherTopics: Topic[] = philosophers.map(({ title, difficulty }, index) => ({
+  category: "PHILOSOPHIE",
+  title,
+  difficulty,
+  constraint: getPhilosopherConstraint(index),
+  accent: "#8ed6a8",
+}));
+
 export const topics: Topic[] = [
   { category: "HISTOIRE", title: "La révolte des Taiping", difficulty: 4, constraint: "Ta présentation doit contenir une carte.", accent: "#ff5b35" },
   { category: "SCIENCES", title: "Les lichens", difficulty: 3, constraint: "Explique le sujet sans utiliser de jargon.", accent: "#55b9ff" },
@@ -357,4 +375,6 @@ export const topics: Topic[] = [
   ...internetCultureTopics,
   ...historicalPeriodTopics,
   ...religiousMovementTopics,
+  ...socialScienceThinkerTopics,
+  ...philosopherTopics,
 ];
