@@ -4,6 +4,7 @@ import { getPhilosophyConstraint, philosophyMovements } from "./philosophy-movem
 import { getSocialScienceConstraint, socialScienceTheories } from "./social-science-theories";
 import { getPoliticalConstraint, politicalMovements } from "./political-movements";
 import { getPoliticalFigureConstraint, politicalFigures } from "./political-figures";
+import { getScientistConstraint, scientists } from "./scientists";
 
 export type Topic = {
   category: string;
@@ -290,6 +291,14 @@ const politicalFigureTopics: Topic[] = politicalFigures.map(({ title, difficulty
   accent: "#ff5b35",
 }));
 
+const scientistTopics: Topic[] = scientists.map(({ title, difficulty }, index) => ({
+  category: "SCIENCES",
+  title,
+  difficulty,
+  constraint: getScientistConstraint(index),
+  accent: "#55b9ff",
+}));
+
 export const topics: Topic[] = [
   { category: "HISTOIRE", title: "La révolte des Taiping", difficulty: 4, constraint: "Ta présentation doit contenir une carte.", accent: "#ff5b35" },
   { category: "SCIENCES", title: "Les lichens", difficulty: 3, constraint: "Explique le sujet sans utiliser de jargon.", accent: "#55b9ff" },
@@ -307,4 +316,5 @@ export const topics: Topic[] = [
   ...socialScienceTopics,
   ...politicalTopics,
   ...politicalFigureTopics,
+  ...scientistTopics,
 ];
