@@ -10,6 +10,7 @@ type BlockPosition = { x: number; y: number; width: number };
 type Slide = { id: string; title: string; body: string; background?: string; color?: string; image?: string; layout?: "impact" | "canvas"; positions?: Partial<Record<SlideBlock, BlockPosition>> };
 type MindNode = { id: string; text: string; x: number; y: number; color: string };
 type GameMode = "classic" | "fast";
+type ThemeMode = "light" | "dark";
 type Session = {
   topic: Topic;
   mode: GameMode;
@@ -26,6 +27,7 @@ type Screen = "home" | "topics" | "roll" | "workspace" | "over" | "present";
 type Tab = "notes" | "sources" | "cards" | "mindmap" | "slides";
 
 const SESSION_KEY = "brainroll-session-v1";
+const THEME_KEY = "brainroll-theme";
 const TOPICS_PER_PAGE = 50;
 const TOPIC_THEMES = Array.from(new Set(topics.map((entry) => entry.category))).sort((a, b) => a.localeCompare(b, "fr"));
 const MODE_CONFIG = {
@@ -66,6 +68,14 @@ export default function Home() {
   const [topicPage, setTopicPage] = useState(0);
   const [selectedThemes, setSelectedThemes] = useState<string[]>(TOPIC_THEMES);
   const [topicDifficulty, setTopicDifficulty] = useState<number | "all">("all");
+  const [theme, setTheme] = useState<ThemeMode>("light");
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem(THEME_KEY);
+    const initialTheme: ThemeMode = savedTheme === "dark" || savedTheme === "light" ? savedTheme : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    setTheme(initialTheme);
+    document.documentElement.dataset.theme = initialTheme;
+  }, []);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(SESSION_KEY);
@@ -134,6 +144,13 @@ export default function Home() {
     setSelectedMode(mode);
     setScreen("roll");
     window.setTimeout(() => roll(mode), 80);
+  }
+
+  function toggleTheme() {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    document.documentElement.dataset.theme = nextTheme;
+    window.localStorage.setItem(THEME_KEY, nextTheme);
   }
 
   function startSession() {
@@ -205,7 +222,7 @@ export default function Home() {
     const preset = BLOCK_PRESETS[slide.layout ?? "impact"];
     return (
       <main className="presentation" style={{ "--topic-accent": session.topic.accent } as React.CSSProperties}>
-        <div className="present-top"><span>⚄ BRAINROLL</span><span>{presentIndex + 1} / {session.slides.length}</span></div>
+        <div className="present-top"><span>⚄ BRAINROLL</span><div><ThemeToggle theme={theme} onToggle={toggleTheme} /><span>{presentIndex + 1} / {session.slides.length}</span></div></div>
         <section className="present-slide freeform-slide" style={{ background: slide.background ?? "#f2efe6", color: slide.color ?? "#191815" }}>
           <span className="slide-kicker">{session.topic.category} · {session.topic.title}</span>
           <div className="present-block present-title" style={blockStyle(slide.positions?.title ?? preset.title)} dangerouslySetInnerHTML={{ __html: sanitizeRichText(slide.title) }} />
@@ -225,6 +242,7 @@ export default function Home() {
   if (screen === "over" && session) {
     return (
       <main className="over-screen" style={{ "--topic-accent": session.topic.accent } as React.CSSProperties}>
+        <ThemeToggle theme={theme} onToggle={toggleTheme} extraClass="over-theme-toggle" />
         <div className="over-stamp">00:00 · READ ONLY</div>
         <div className="lock-icon">⌁</div>
         <p className="eyebrow">TIME&apos;S UP</p>
@@ -242,8 +260,8 @@ export default function Home() {
       <nav className="topbar">
         <button className="brand" onClick={() => setScreen("home")}><span className="brand-die">⚄</span> BRAINROLL</button>
         {screen === "workspace" && session ? (
-          <div className={`timer ${secondsLeft <= 300 ? "urgent" : ""}`}><span className="timer-dot" /> {formatTime(secondsLeft)}</div>
-        ) : <div className="topbar-actions"><button className={`topics-tab ${screen === "topics" ? "active" : ""}`} onClick={() => setScreen(screen === "topics" ? "home" : "topics")}>{screen === "topics" ? "FERMER LA LISTE" : "VOIR LA LISTE DES SUJETS"}</button><div className="top-meta"><span className={session ? "live-dot active" : "live-dot"} /> {session ? "SESSION SAVED" : "NO SESSION RUNNING"}</div></div>}
+          <div className="workspace-top-actions"><ThemeToggle theme={theme} onToggle={toggleTheme} /><div className={`timer ${secondsLeft <= 300 ? "urgent" : ""}`}><span className="timer-dot" /> {formatTime(secondsLeft)}</div></div>
+        ) : <div className="topbar-actions"><ThemeToggle theme={theme} onToggle={toggleTheme} /><button className={`topics-tab ${screen === "topics" ? "active" : ""}`} onClick={() => setScreen(screen === "topics" ? "home" : "topics")}>{screen === "topics" ? "FERMER LA LISTE" : "VOIR LA LISTE DES SUJETS"}</button><div className="top-meta"><span className={session ? "live-dot active" : "live-dot"} /> {session ? "SESSION SAVED" : "NO SESSION RUNNING"}</div></div>}
       </nav>
 
       {screen === "home" && (
@@ -427,6 +445,11 @@ function RichTextEditor({ value, onChange, className, label }: { value: string; 
   }, [safeValue]);
 
   return <div ref={editorRef} className={className} role="textbox" aria-label={label} aria-multiline="true" contentEditable suppressContentEditableWarning onInput={(event) => onChange(sanitizeRichText(event.currentTarget.innerHTML))} onBlur={(event) => { const clean = sanitizeRichText(event.currentTarget.innerHTML); event.currentTarget.innerHTML = clean; onChange(clean); }} />;
+}
+
+function ThemeToggle({ theme, onToggle, extraClass = "" }: { theme: ThemeMode; onToggle: () => void; extraClass?: string }) {
+  const dark = theme === "dark";
+  return <button className={`theme-toggle ${extraClass}`} type="button" aria-pressed={dark} aria-label={dark ? "Activer le mode clair" : "Activer le mode sombre"} title={dark ? "Mode clair" : "Mode sombre"} onClick={onToggle}><span aria-hidden="true">{dark ? "☀" : "☾"}</span><b>{dark ? "CLAIR" : "SOMBRE"}</b></button>;
 }
 
 function TopicPagination({ page, pageCount, total, onChange }: { page: number; pageCount: number; total: number; onChange: (page: number) => void }) {
