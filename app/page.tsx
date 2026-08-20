@@ -22,10 +22,12 @@ type Session = {
   mindMap?: MindNode[];
   locked: boolean;
 };
-type Screen = "home" | "roll" | "workspace" | "over" | "present";
+type Screen = "home" | "topics" | "roll" | "workspace" | "over" | "present";
 type Tab = "notes" | "sources" | "cards" | "mindmap" | "slides";
 
 const SESSION_KEY = "brainroll-session-v1";
+const TOPICS_PER_PAGE = 50;
+const TOPIC_THEMES = Array.from(new Set(topics.map((entry) => entry.category))).sort((a, b) => a.localeCompare(b, "fr"));
 const MODE_CONFIG = {
   classic: { label: "CLASSIQUE", durationSeconds: 60 * 60 },
   fast: { label: "FAST", durationSeconds: 30 * 60 },
@@ -61,6 +63,9 @@ export default function Home() {
   const [slideIndex, setSlideIndex] = useState(0);
   const [presentIndex, setPresentIndex] = useState(0);
   const [confirmAbandon, setConfirmAbandon] = useState(false);
+  const [topicPage, setTopicPage] = useState(0);
+  const [selectedThemes, setSelectedThemes] = useState<string[]>(TOPIC_THEMES);
+  const [topicDifficulty, setTopicDifficulty] = useState<number | "all">("all");
 
   useEffect(() => {
     const saved = window.localStorage.getItem(SESSION_KEY);
@@ -107,6 +112,11 @@ export default function Home() {
   }, [screen, session?.locked, session?.slides.length]);
 
   const progress = useMemo(() => session ? Math.max(0, Math.min(100, (secondsLeft / session.durationSeconds) * 100)) : 100, [secondsLeft, session]);
+  const filteredTopics = useMemo(() => {
+    return topics.filter((entry) => selectedThemes.includes(entry.category) && (topicDifficulty === "all" || entry.difficulty === topicDifficulty));
+  }, [selectedThemes, topicDifficulty]);
+  const topicPageCount = Math.max(1, Math.ceil(filteredTopics.length / TOPICS_PER_PAGE));
+  const visibleTopics = filteredTopics.slice(topicPage * TOPICS_PER_PAGE, (topicPage + 1) * TOPICS_PER_PAGE);
 
   function roll(mode = selectedMode) {
     if (rolling) return;
@@ -233,7 +243,7 @@ export default function Home() {
         <button className="brand" onClick={() => setScreen("home")}><span className="brand-die">⚄</span> BRAINROLL</button>
         {screen === "workspace" && session ? (
           <div className={`timer ${secondsLeft <= 300 ? "urgent" : ""}`}><span className="timer-dot" /> {formatTime(secondsLeft)}</div>
-        ) : <div className="top-meta"><span className={session ? "live-dot active" : "live-dot"} /> {session ? "SESSION SAVED" : "NO SESSION RUNNING"}</div>}
+        ) : <div className="topbar-actions"><button className={`topics-tab ${screen === "topics" ? "active" : ""}`} onClick={() => setScreen(screen === "topics" ? "home" : "topics")}>{screen === "topics" ? "FERMER LA LISTE" : "VOIR LA LISTE DES SUJETS"}</button><div className="top-meta"><span className={session ? "live-dot active" : "live-dot"} /> {session ? "SESSION SAVED" : "NO SESSION RUNNING"}</div></div>}
       </nav>
 
       {screen === "home" && (
@@ -250,6 +260,27 @@ export default function Home() {
             </div>
           )}
           <div className="loop" aria-label="Les cinq étapes du jeu">{["ROLL", "RESEARCH", "UNDERSTAND", "BUILD", "PRESENT"].map((step, i) => <span key={step}>{i > 0 && <b>→</b>}{step}</span>)}</div>
+        </section>
+      )}
+
+      {screen === "topics" && (
+        <section className="topics-catalog">
+          <header className="catalog-heading">
+            <div><span className="eyebrow">THE FULL BRAINROLL</span><h1>LISTE DES SUJETS</h1><p>{filteredTopics.length === topics.length ? `${topics.length} sujets disponibles` : `${filteredTopics.length} résultat${filteredTopics.length > 1 ? "s" : ""} sur ${topics.length}`}, présentés par tranches de 50.</p></div>
+            <div className="catalog-range"><span>TRANCHE</span><strong>{filteredTopics.length ? topicPage * TOPICS_PER_PAGE + 1 : 0}–{Math.min((topicPage + 1) * TOPICS_PER_PAGE, filteredTopics.length)}</strong><small>SUR {filteredTopics.length}</small></div>
+          </header>
+          <div className="catalog-filters">
+            <details className="theme-menu"><summary><span>THÈMES</span><strong>{selectedThemes.length} / {TOPIC_THEMES.length}</strong></summary><div className="theme-dropdown"><div className="theme-filter-actions"><button type="button" onClick={() => { setSelectedThemes(TOPIC_THEMES); setTopicPage(0); }}>TOUT COCHER</button><button type="button" onClick={() => { setSelectedThemes([]); setTopicPage(0); }}>TOUT DÉCOCHER</button></div><div className="theme-checkboxes">{TOPIC_THEMES.map((theme) => <label key={theme}><input type="checkbox" checked={selectedThemes.includes(theme)} onChange={() => { setSelectedThemes((current) => current.includes(theme) ? current.filter((entry) => entry !== theme) : [...current, theme]); setTopicPage(0); }} /><span>{theme}</span></label>)}</div></div></details>
+            <label className="difficulty-filter"><span>DIFFICULTÉ</span><select value={topicDifficulty} onChange={(event) => { setTopicDifficulty(event.target.value === "all" ? "all" : Number(event.target.value)); setTopicPage(0); }}><option value="all">TOUTES</option>{[1, 2, 3, 4, 5].map((level) => <option value={level} key={level}>{"★".repeat(level)}{"☆".repeat(5 - level)}</option>)}</select></label>
+            {(selectedThemes.length !== TOPIC_THEMES.length || topicDifficulty !== "all") && <button className="reset-catalog-filters" onClick={() => { setSelectedThemes(TOPIC_THEMES); setTopicDifficulty("all"); setTopicPage(0); }}>RÉINITIALISER ×</button>}
+          </div>
+          {!!visibleTopics.length && <TopicPagination page={topicPage} pageCount={topicPageCount} total={filteredTopics.length} onChange={setTopicPage} />}
+          <div className="topics-table" role="table" aria-label="Liste des sujets Brainroll">
+            <div className="topic-row topic-table-head" role="row"><span>#</span><span>SUJET</span><span>THÈME</span><span>DIFFICULTÉ</span></div>
+            {visibleTopics.map((entry, index) => <div className="topic-row" role="row" key={`${entry.category}-${entry.title}-${topicPage * TOPICS_PER_PAGE + index}`} style={{ "--row-accent": entry.accent } as React.CSSProperties}><span>{String(topicPage * TOPICS_PER_PAGE + index + 1).padStart(3, "0")}</span><strong>{entry.title}</strong><span>{entry.category}</span><span className="catalog-difficulty" aria-label={`${entry.difficulty} étoiles sur 5`}>{"★".repeat(entry.difficulty)}<i>{"☆".repeat(5 - entry.difficulty)}</i></span></div>)}
+            {!visibleTopics.length && <div className="catalog-empty"><span>⌕</span><strong>AUCUN SUJET TROUVÉ</strong><p>Essaie un autre nom ou une autre difficulté.</p></div>}
+          </div>
+          {!!visibleTopics.length && <TopicPagination page={topicPage} pageCount={topicPageCount} total={filteredTopics.length} onChange={setTopicPage} />}
         </section>
       )}
 
@@ -381,6 +412,7 @@ function SlideCanvas({ slide, topic, index, onChange }: { slide: Slide; topic: T
           <button className="remove-slide-image" aria-label="Retirer l’image" onClick={() => onChange({ image: undefined })}>×</button>
         </div>
       )}
+
       <i>{String(index + 1).padStart(2, "0")}</i>
     </div>
   );
@@ -395,6 +427,15 @@ function RichTextEditor({ value, onChange, className, label }: { value: string; 
   }, [safeValue]);
 
   return <div ref={editorRef} className={className} role="textbox" aria-label={label} aria-multiline="true" contentEditable suppressContentEditableWarning onInput={(event) => onChange(sanitizeRichText(event.currentTarget.innerHTML))} onBlur={(event) => { const clean = sanitizeRichText(event.currentTarget.innerHTML); event.currentTarget.innerHTML = clean; onChange(clean); }} />;
+}
+
+function TopicPagination({ page, pageCount, total, onChange }: { page: number; pageCount: number; total: number; onChange: (page: number) => void }) {
+  function changePage(next: number) {
+    onChange(Math.max(0, Math.min(pageCount - 1, next)));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  return <nav className="topic-pagination" aria-label="Pagination des sujets"><button disabled={page === 0} onClick={() => changePage(page - 1)}>← PRÉCÉDENTS</button><label>VOIR <select value={page} onChange={(event) => changePage(Number(event.target.value))}>{Array.from({ length: pageCount }, (_, index) => <option key={index} value={index}>{index * TOPICS_PER_PAGE + 1}–{Math.min((index + 1) * TOPICS_PER_PAGE, total)}</option>)}</select></label><span>{page + 1} / {pageCount}</span><button disabled={page === pageCount - 1} onClick={() => changePage(page + 1)}>SUIVANTS →</button></nav>;
 }
 
 function Panel({ title, eyebrow, count, children }: { title: string; eyebrow: string; count: string; children: React.ReactNode }) {
