@@ -223,6 +223,7 @@ export default function Home() {
           <article className="topic-card" style={{ borderTopColor: topic.accent }}>
             <span className="category">{rolling ? "SEARCHING..." : topic.category}</span>
             <h2>{rolling ? "????????" : topic.title}</h2>
+            {!rolling && topic.region && <div className="topic-region">{topic.region}</div>}
             <div className="difficulty"><span>DIFFICULTY</span> {"★".repeat(topic.difficulty)}{"☆".repeat(5 - topic.difficulty)}</div>
             <div className="constraint"><small>CHAOS CONSTRAINT</small><strong>{topic.constraint}</strong></div>
           </article>

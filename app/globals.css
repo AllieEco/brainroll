@@ -33,6 +33,7 @@ footer { min-height:58px; border-top:2px solid var(--ink); border-bottom:0; font
 .topic-card { width:min(680px,92vw); padding:27px 34px 30px; background:var(--cream); border:2px solid var(--ink); border-top-width:9px; box-shadow:9px 9px 0 var(--ink); transform:rotate(-.5deg); }
 .category { font:900 11px/1 monospace; letter-spacing:2px; color:var(--orange); }
 .topic-card h2 { margin:12px 0 17px; font-size:clamp(34px,6vw,65px); line-height:.95; letter-spacing:-.055em; }
+.topic-region { margin:-6px 0 17px; font:800 10px/1.2 monospace; letter-spacing:1.4px; text-transform:uppercase; opacity:.58; }
 .difficulty { border-top:1px solid var(--line); padding-top:15px; font-size:18px; color:var(--orange); }
 .difficulty span { color:var(--ink); font:800 10px/1 monospace; letter-spacing:1px; margin-right:12px; }
 .constraint { margin-top:18px; padding:14px; background:var(--acid); text-align:left; display:flex; flex-direction:column; gap:6px; }

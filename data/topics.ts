@@ -1,9 +1,12 @@
+import { artists, getArtistConstraint } from "./artists";
+
 export type Topic = {
   category: string;
   title: string;
   difficulty: number;
   constraint: string;
   accent: string;
+  region?: string;
 };
 
 const literatureConstraints = [
@@ -233,10 +236,18 @@ const literatureTopics: Topic[] = literaryFigures.map(([title, difficulty], inde
   accent: "#c19cff",
 }));
 
+const artistTopics: Topic[] = artists.map(({ title, region, difficulty }, index) => ({
+  category: "ART",
+  title,
+  region,
+  difficulty,
+  constraint: getArtistConstraint(index),
+  accent: "#ff8ec7",
+}));
+
 export const topics: Topic[] = [
   { category: "HISTOIRE", title: "La révolte des Taiping", difficulty: 4, constraint: "Ta présentation doit contenir une carte.", accent: "#ff5b35" },
   { category: "SCIENCES", title: "Les lichens", difficulty: 3, constraint: "Explique le sujet sans utiliser de jargon.", accent: "#55b9ff" },
-  { category: "ART", title: "Artemisia Gentileschi", difficulty: 3, constraint: "Intègre une source primaire.", accent: "#ff8ec7" },
   { category: "GÉOGRAPHIE", title: "Ouagadougou", difficulty: 2, constraint: "Une slide doit être une carte commentée.", accent: "#dfff43" },
   { category: "HISTOIRE", title: "Les égouts de Londres au XIXe siècle", difficulty: 4, constraint: "Ajoute une chronologie de cinq dates maximum.", accent: "#ffca45" },
   { category: "CULTURES", title: "Le théâtre nō", difficulty: 4, constraint: "Maximum 8 slides.", accent: "#c19cff" },
@@ -245,4 +256,5 @@ export const topics: Topic[] = [
   { category: "TECHNOLOGIE", title: "L’histoire du téflon", difficulty: 3, constraint: "Aucun texte de plus de 25 mots par slide.", accent: "#dfff43" },
   { category: "CIVILISATIONS", title: "Le royaume d’Aksoum", difficulty: 4, constraint: "Compare deux interprétations historiques.", accent: "#c19cff" },
   ...literatureTopics,
+  ...artistTopics,
 ];
