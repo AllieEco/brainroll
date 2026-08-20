@@ -5,6 +5,8 @@ import { getSocialScienceConstraint, socialScienceTheories } from "./social-scie
 import { getPoliticalConstraint, politicalMovements } from "./political-movements";
 import { getPoliticalFigureConstraint, politicalFigures } from "./political-figures";
 import { getScientistConstraint, scientists } from "./scientists";
+import { getInternetFigureConstraint, internetFigures } from "./internet-figures";
+import { getInternetTopicConstraint, internetTopics } from "./internet-topics";
 
 export type Topic = {
   category: string;
@@ -299,6 +301,22 @@ const scientistTopics: Topic[] = scientists.map(({ title, difficulty }, index) =
   accent: "#55b9ff",
 }));
 
+const internetFigureTopics: Topic[] = internetFigures.map(({ title, difficulty }, index) => ({
+  category: "INTERNET",
+  title,
+  difficulty,
+  constraint: getInternetFigureConstraint(index),
+  accent: "#dfff43",
+}));
+
+const internetCultureTopics: Topic[] = internetTopics.map(({ title, difficulty }, index) => ({
+  category: "INTERNET",
+  title,
+  difficulty,
+  constraint: getInternetTopicConstraint(index),
+  accent: "#dfff43",
+}));
+
 export const topics: Topic[] = [
   { category: "HISTOIRE", title: "La révolte des Taiping", difficulty: 4, constraint: "Ta présentation doit contenir une carte.", accent: "#ff5b35" },
   { category: "SCIENCES", title: "Les lichens", difficulty: 3, constraint: "Explique le sujet sans utiliser de jargon.", accent: "#55b9ff" },
@@ -317,4 +335,6 @@ export const topics: Topic[] = [
   ...politicalTopics,
   ...politicalFigureTopics,
   ...scientistTopics,
+  ...internetFigureTopics,
+  ...internetCultureTopics,
 ];
