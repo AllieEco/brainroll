@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { topics, type Topic } from "../data/topics";
 
-type Topic = { category: string; title: string; difficulty: number; constraint: string; accent: string };
 type Source = { id: string; title: string; url: string };
 type Card = { id: string; front: string; back: string };
 type Slide = { id: string; title: string; body: string; background?: string; color?: string; image?: string; layout?: "impact" | "canvas" };
@@ -21,19 +21,6 @@ type Screen = "home" | "roll" | "workspace" | "over" | "present";
 type Tab = "notes" | "sources" | "cards" | "mindmap" | "slides";
 
 const SESSION_KEY = "brainroll-session-v1";
-const topics: Topic[] = [
-  { category: "HISTOIRE", title: "La révolte des Taiping", difficulty: 4, constraint: "Ta présentation doit contenir une carte.", accent: "#ff5b35" },
-  { category: "SCIENCES", title: "Les lichens", difficulty: 3, constraint: "Explique le sujet sans utiliser de jargon.", accent: "#55b9ff" },
-  { category: "ART", title: "Artemisia Gentileschi", difficulty: 3, constraint: "Intègre une source primaire.", accent: "#ff8ec7" },
-  { category: "GÉOGRAPHIE", title: "Ouagadougou", difficulty: 2, constraint: "Une slide doit être une carte commentée.", accent: "#dfff43" },
-  { category: "HISTOIRE", title: "Les égouts de Londres au XIXe siècle", difficulty: 4, constraint: "Ajoute une chronologie de cinq dates maximum.", accent: "#ffca45" },
-  { category: "CULTURES", title: "Le théâtre nō", difficulty: 4, constraint: "Maximum 8 slides.", accent: "#c19cff" },
-  { category: "HISTOIRE", title: "La République de Weimar", difficulty: 4, constraint: "Explique une controverse autour du sujet.", accent: "#ff5b35" },
-  { category: "SCIENCES", title: "Les tardigrades", difficulty: 2, constraint: "Une slide doit contenir un meme exact.", accent: "#55b9ff" },
-  { category: "TECHNOLOGIE", title: "L’histoire du téflon", difficulty: 3, constraint: "Aucun texte de plus de 25 mots par slide.", accent: "#dfff43" },
-  { category: "CIVILISATIONS", title: "Le royaume d’Aksoum", difficulty: 4, constraint: "Compare deux interprétations historiques.", accent: "#c19cff" },
-];
-
 const uid = () => Math.random().toString(36).slice(2, 9);
 const freshSlide = (n = 1): Slide => ({ id: uid(), title: n === 1 ? "Titre de la présentation" : `Slide ${n}`, body: n === 1 ? "Une phrase qui donne envie d’écouter la suite." : "Ajoute ton idée essentielle ici.", background: "#f2efe6", color: "#191815", layout: "impact" });
 const formatTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
