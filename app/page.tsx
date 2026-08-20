@@ -7,8 +7,11 @@ type Source = { id: string; title: string; url: string };
 type Card = { id: string; front: string; back: string };
 type Slide = { id: string; title: string; body: string; background?: string; color?: string; image?: string; layout?: "impact" | "canvas" };
 type MindNode = { id: string; text: string; x: number; y: number; color: string };
+type GameMode = "classic" | "fast";
 type Session = {
   topic: Topic;
+  mode: GameMode;
+  durationSeconds: number;
   endsAt: number;
   notes: string;
   sources: Source[];
@@ -21,6 +24,10 @@ type Screen = "home" | "roll" | "workspace" | "over" | "present";
 type Tab = "notes" | "sources" | "cards" | "mindmap" | "slides";
 
 const SESSION_KEY = "brainroll-session-v1";
+const MODE_CONFIG = {
+  classic: { label: "CLASSIQUE", durationSeconds: 60 * 60 },
+  fast: { label: "FAST", durationSeconds: 30 * 60 },
+} as const;
 const uid = () => Math.random().toString(36).slice(2, 9);
 const freshSlide = (n = 1): Slide => ({ id: uid(), title: n === 1 ? "Titre de la présentation" : `Slide ${n}`, body: n === 1 ? "Une phrase qui donne envie d’écouter la suite." : "Ajoute ton idée essentielle ici.", background: "#f2efe6", color: "#191815", layout: "impact" });
 const formatTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
@@ -28,6 +35,7 @@ const formatTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padS
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("home");
   const [topic, setTopic] = useState(topics[0]);
+  const [selectedMode, setSelectedMode] = useState<GameMode>("classic");
   const [rolling, setRolling] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [tab, setTab] = useState<Tab>("notes");
@@ -44,7 +52,8 @@ export default function Home() {
     try {
       const restored = JSON.parse(saved) as Session;
       const locked = restored.locked || Date.now() >= restored.endsAt;
-      const next = { ...restored, locked, mindMap: restored.mindMap ?? [] };
+      const mode = restored.mode ?? "classic";
+      const next = { ...restored, mode, durationSeconds: restored.durationSeconds ?? MODE_CONFIG[mode].durationSeconds, locked, mindMap: restored.mindMap ?? [] };
       setSession(next);
       setSecondsLeft(Math.max(0, Math.ceil((next.endsAt - Date.now()) / 1000)));
       setScreen(locked ? "over" : "home");
@@ -81,23 +90,31 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [screen, session?.locked, session?.slides.length]);
 
-  const progress = useMemo(() => session ? Math.max(0, Math.min(100, (secondsLeft / 3600) * 100)) : 100, [secondsLeft, session]);
+  const progress = useMemo(() => session ? Math.max(0, Math.min(100, (secondsLeft / session.durationSeconds) * 100)) : 100, [secondsLeft, session]);
 
-  function roll() {
+  function roll(mode = selectedMode) {
     if (rolling) return;
+    const pool = mode === "fast" ? topics.filter((candidate) => candidate.difficulty === 1) : topics;
     setRolling(true);
     let ticks = 0;
     const shuffle = window.setInterval(() => {
-      setTopic(topics[Math.floor(Math.random() * topics.length)]);
+      setTopic(pool[Math.floor(Math.random() * pool.length)]);
       ticks++;
       if (ticks >= 8) { window.clearInterval(shuffle); setRolling(false); }
     }, 90);
   }
 
+  function chooseMode(mode: GameMode) {
+    setSelectedMode(mode);
+    setScreen("roll");
+    window.setTimeout(() => roll(mode), 80);
+  }
+
   function startSession() {
-    const next: Session = { topic, endsAt: Date.now() + 60 * 60 * 1000, notes: "", sources: [], cards: [], slides: [freshSlide()], mindMap: [], locked: false };
+    const durationSeconds = MODE_CONFIG[selectedMode].durationSeconds;
+    const next: Session = { topic, mode: selectedMode, durationSeconds, endsAt: Date.now() + durationSeconds * 1000, notes: "", sources: [], cards: [], slides: [freshSlide()], mindMap: [], locked: false };
     setSession(next);
-    setSecondsLeft(3600);
+    setSecondsLeft(durationSeconds);
     setTab("notes");
     setScreen("workspace");
   }
@@ -208,35 +225,40 @@ export default function Home() {
         <section className="hero">
           <div className="eyebrow">A KNOWLEDGE SPEEDRUN</div>
           <h1>ROLL THE DICE.<br /><em>FEED YOUR BRAIN.</em></h1>
-          <p className="lede">Un sujet. Une heure. Une présentation.<br />Jusqu&apos;où peut aller ta curiosité avant la fin du chrono ?</p>
+          <p className="lede">Un sujet. Trente ou soixante minutes. Une présentation.<br />Jusqu&apos;où peut aller ta curiosité avant la fin du chrono ?</p>
           {session && !session.locked ? (
-            <div className="resume-box"><span>PARTIE EN COURS · {session.topic.title}</span><button className="primary" onClick={() => setScreen("workspace")}>REPRENDRE · {formatTime(secondsLeft)} <span>→</span></button></div>
-          ) : <button className="primary" onClick={() => { setScreen("roll"); window.setTimeout(roll, 80); }}>LET&apos;S ROLL <span>→</span></button>}
+            <div className="resume-box"><span>{MODE_CONFIG[session.mode].label} · PARTIE EN COURS · {session.topic.title}</span><button className="primary" onClick={() => setScreen("workspace")}>REPRENDRE · {formatTime(secondsLeft)} <span>→</span></button></div>
+          ) : (
+            <div className="mode-picker" aria-label="Choisir un mode de jeu">
+              <button className="mode-button classic" onClick={() => chooseMode("classic")}><span>CLASSIQUE</span><strong>60&apos;00</strong><small>TOUTES DIFFICULTÉS</small></button>
+              <button className="mode-button fast" onClick={() => chooseMode("fast")}><span>FAST</span><strong>30&apos;00</strong><small>SUJETS ★ UNIQUEMENT</small></button>
+            </div>
+          )}
           <div className="loop" aria-label="Les cinq étapes du jeu">{["ROLL", "RESEARCH", "UNDERSTAND", "BUILD", "PRESENT"].map((step, i) => <span key={step}>{i > 0 && <b>→</b>}{step}</span>)}</div>
         </section>
       )}
 
       {screen === "roll" && (
         <section className="roll-screen">
-          <div className="eyebrow">YOUR NEXT OBSESSION</div>
+          <div className="eyebrow">{MODE_CONFIG[selectedMode].label} MODE · YOUR NEXT OBSESSION</div>
           <div className={`dice ${rolling ? "is-rolling" : ""}`} aria-hidden="true">⚄</div>
           <article className="topic-card" style={{ borderTopColor: topic.accent }}>
             <span className="category">{rolling ? "SEARCHING..." : topic.category}</span>
             <h2>{rolling ? "????????" : topic.title}</h2>
             {!rolling && topic.region && <div className="topic-region">{topic.region}</div>}
             <div className="difficulty"><span>DIFFICULTY</span> {"★".repeat(topic.difficulty)}{"☆".repeat(5 - topic.difficulty)}</div>
-            <div className="constraint"><small>CHAOS CONSTRAINT</small><strong>{topic.constraint}</strong></div>
+            {selectedMode === "classic" && <div className="constraint"><small>CHAOS CONSTRAINT</small><strong>{topic.constraint}</strong></div>}
           </article>
-          <div className="roll-actions"><button className="secondary" onClick={roll} disabled={rolling}>↻ REROLL</button><button className="primary" onClick={startSession} disabled={rolling}>GO <span>→</span></button></div>
-          <p className="go-warning">Le chrono de 60 minutes démarre au clic.</p>
+          <div className="roll-actions"><button className="secondary" onClick={() => roll()} disabled={rolling}>↻ REROLL</button><button className="primary" onClick={startSession} disabled={rolling}>GO <span>→</span></button></div>
+          <p className="go-warning">Le chrono de {MODE_CONFIG[selectedMode].durationSeconds / 60} minutes démarre au clic.{selectedMode === "fast" ? " Tirage limité aux sujets ★." : ""}</p>
         </section>
       )}
 
       {screen === "workspace" && session && (
         <section className="workspace">
           <header className="challenge-strip">
-            <div><span>{session.topic.category}</span><strong>{session.topic.title}</strong></div>
-            <div className="constraint-mini"><span>CONTRAINTE</span><strong>{session.topic.constraint}</strong></div>
+            <div><span>{MODE_CONFIG[session.mode].label} · {session.topic.category}</span><strong>{session.topic.title}</strong></div>
+            {session.mode === "classic" && <div className="constraint-mini"><span>CONTRAINTE</span><strong>{session.topic.constraint}</strong></div>}
             <div className="session-actions"><span className="autosave">✓ SAUVEGARDÉ</span><button onClick={() => setConfirmAbandon(true)}>ABANDONNER</button></div>
           </header>
           <div className="time-progress"><i style={{ width: `${progress}%` }} /></div>
@@ -288,7 +310,7 @@ export default function Home() {
           </div>
         </section>
       )}
-      {screen !== "workspace" && <footer><span>LESS BRAINROT. MORE BRAIN.</span><span>60:00 · CLASSIC MODE</span></footer>}
+      {screen !== "workspace" && <footer><span>LESS BRAINROT. MORE BRAIN.</span><span>{selectedMode === "fast" ? "30:00 · FAST MODE · ★" : "60:00 · CLASSIC MODE"}</span></footer>}
       {confirmAbandon && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="abandon-title"><div className="confirm-modal"><span>⚠ DANGER ZONE</span><h2 id="abandon-title">Abandonner la partie ?</h2><p>Le chrono s’arrêtera et toutes les notes, sources, cartes et slides de cette session seront supprimées.</p><div><button className="secondary" onClick={() => setConfirmAbandon(false)}>CONTINUER LA PARTIE</button><button className="danger" onClick={abandonSession}>OUI, ABANDONNER</button></div></div></div>}
     </main>
   );
