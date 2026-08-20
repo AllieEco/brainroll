@@ -15,6 +15,7 @@ import { countries, getCountryConstraint } from "./countries";
 import { getWaterGeographyConstraint, waterGeographyTopics } from "./water-geography";
 import { getPlantConstraint, plants } from "./plants";
 import { animals, getAnimalConstraint } from "./animals";
+import { getScientificTopicConstraint, scientificTopics } from "./scientific-topics";
 
 export type Topic = {
   category: string;
@@ -389,6 +390,14 @@ const animalTopics: Topic[] = animals.map(({ title, difficulty }, index) => ({
   accent: "#ffca45",
 }));
 
+const scienceSubjectTopics: Topic[] = scientificTopics.map(({ title, difficulty }, index) => ({
+  category: "SCIENCES",
+  title,
+  difficulty,
+  constraint: getScientificTopicConstraint(index),
+  accent: "#55b9ff",
+}));
+
 export const topics: Topic[] = [
   { category: "HISTOIRE", title: "La révolte des Taiping", difficulty: 4, constraint: "Ta présentation doit contenir une carte.", accent: "#ff5b35" },
   { category: "SCIENCES", title: "Les lichens", difficulty: 3, constraint: "Explique le sujet sans utiliser de jargon.", accent: "#55b9ff" },
@@ -417,4 +426,5 @@ export const topics: Topic[] = [
   ...aquaticGeographyTopics,
   ...plantTopics,
   ...animalTopics,
+  ...scienceSubjectTopics,
 ];
