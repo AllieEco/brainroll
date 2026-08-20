@@ -16,6 +16,9 @@ import { getWaterGeographyConstraint, waterGeographyTopics } from "./water-geogr
 import { getPlantConstraint, plants } from "./plants";
 import { animals, getAnimalConstraint } from "./animals";
 import { getScientificTopicConstraint, scientificTopics } from "./scientific-topics";
+import { getMythologyConstraint, mythologyTopics } from "./mythology";
+import { cuisineTopics, getCuisineConstraint } from "./cuisine";
+import { culinaryFigures, getCulinaryFigureConstraint } from "./culinary-figures";
 
 export type Topic = {
   category: string;
@@ -398,6 +401,30 @@ const scienceSubjectTopics: Topic[] = scientificTopics.map(({ title, difficulty 
   accent: "#55b9ff",
 }));
 
+const mythTopics: Topic[] = mythologyTopics.map(({ title, difficulty }, index) => ({
+  category: "MYTHOLOGIE",
+  title,
+  difficulty,
+  constraint: getMythologyConstraint(index),
+  accent: "#c19cff",
+}));
+
+const culinaryTopics: Topic[] = cuisineTopics.map(({ title, difficulty }, index) => ({
+  category: "CUISINE",
+  title,
+  difficulty,
+  constraint: getCuisineConstraint(index),
+  accent: "#ff8ec7",
+}));
+
+const culinaryFigureTopics: Topic[] = culinaryFigures.map(({ title, difficulty }, index) => ({
+  category: "CUISINE",
+  title,
+  difficulty,
+  constraint: getCulinaryFigureConstraint(index),
+  accent: "#ffca45",
+}));
+
 export const topics: Topic[] = [
   { category: "HISTOIRE", title: "La révolte des Taiping", difficulty: 4, constraint: "Ta présentation doit contenir une carte.", accent: "#ff5b35" },
   { category: "SCIENCES", title: "Les lichens", difficulty: 3, constraint: "Explique le sujet sans utiliser de jargon.", accent: "#55b9ff" },
@@ -427,4 +454,7 @@ export const topics: Topic[] = [
   ...plantTopics,
   ...animalTopics,
   ...scienceSubjectTopics,
+  ...mythTopics,
+  ...culinaryTopics,
+  ...culinaryFigureTopics,
 ];
