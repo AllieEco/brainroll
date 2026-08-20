@@ -11,6 +11,8 @@ import { getHistoricalPeriodConstraint, historicalPeriods } from "./historical-p
 import { getReligiousMovementConstraint, religiousMovements } from "./religious-movements";
 import { getSocialScienceThinkerConstraint, socialScienceThinkers } from "./social-science-thinkers";
 import { getPhilosopherConstraint, philosophers } from "./philosophers";
+import { countries, getCountryConstraint } from "./countries";
+import { getWaterGeographyConstraint, waterGeographyTopics } from "./water-geography";
 
 export type Topic = {
   category: string;
@@ -353,6 +355,22 @@ const philosopherTopics: Topic[] = philosophers.map(({ title, difficulty }, inde
   accent: "#8ed6a8",
 }));
 
+const countryTopics: Topic[] = countries.map(({ title, difficulty }, index) => ({
+  category: "GÉOGRAPHIE",
+  title,
+  difficulty,
+  constraint: getCountryConstraint(index),
+  accent: "#dfff43",
+}));
+
+const aquaticGeographyTopics: Topic[] = waterGeographyTopics.map(({ title, difficulty }, index) => ({
+  category: "GÉOGRAPHIE",
+  title,
+  difficulty,
+  constraint: getWaterGeographyConstraint(index),
+  accent: "#55b9ff",
+}));
+
 export const topics: Topic[] = [
   { category: "HISTOIRE", title: "La révolte des Taiping", difficulty: 4, constraint: "Ta présentation doit contenir une carte.", accent: "#ff5b35" },
   { category: "SCIENCES", title: "Les lichens", difficulty: 3, constraint: "Explique le sujet sans utiliser de jargon.", accent: "#55b9ff" },
@@ -377,4 +395,6 @@ export const topics: Topic[] = [
   ...religiousMovementTopics,
   ...socialScienceThinkerTopics,
   ...philosopherTopics,
+  ...countryTopics,
+  ...aquaticGeographyTopics,
 ];
