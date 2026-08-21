@@ -64,7 +64,7 @@ footer { min-height:58px; border-top:2px solid var(--ink); border-bottom:0; font
 .time-progress { position:relative; z-index:3; height:5px; background:#aaa; }.time-progress i { display:block; height:100%; background:var(--topic-accent); transition:width .25s linear; }
 .work-layout { position:relative; z-index:1; display:grid; grid-template-columns:215px 1fr; min-height:calc(100vh - 142px); background:rgba(242,239,230,.82); }
 aside { display:flex; flex-direction:column; border-right:2px solid var(--ink); background:rgba(242,239,230,.96); }
-.aside-label { padding:25px 21px 12px; font:800 9px/1 monospace; letter-spacing:2px; opacity:.55; }
+.aside-label { padding:17px 15px; border-bottom:2px solid var(--ink); background:var(--orange); color:#f2efe6; font:950 10px/1.15 monospace; font-weight:950; letter-spacing:1.1px; box-shadow:inset 7px 0 0 var(--acid); }
 aside>button { position:relative; display:grid; grid-template-columns:30px 1fr auto; align-items:center; min-height:58px; padding:0 20px; border:0; border-top:1px solid var(--line); background:transparent; text-align:left; font-weight:900; font-size:12px; }
 aside>button:last-of-type { border-bottom:1px solid var(--line); } aside>button b { font-size:20px; } aside>button em { font:800 10px/1 monospace; font-style:normal; opacity:.55; }
 aside>button.active { background:var(--acid); } aside>button.active::before { content:""; position:absolute; left:0; width:6px; height:100%; background:var(--ink); }

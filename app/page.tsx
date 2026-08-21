@@ -32,6 +32,7 @@ type Tab = "notes" | "sources" | "cards" | "mindmap" | "slides";
 const SESSION_KEY = "brainroll-session-v1";
 const THEME_KEY = "brainroll-theme";
 const TOPICS_PER_PAGE = 50;
+const MAX_REROLLS = 3;
 const TOPIC_THEMES = Array.from(new Set(topics.map((entry) => entry.category))).sort((a, b) => a.localeCompare(b, "fr"));
 const MODE_CONFIG = {
   classic: { label: "CLASSIQUE", durationSeconds: 60 * 60 },
@@ -93,6 +94,7 @@ export default function Home() {
   const [topic, setTopic] = useState(topics[0]);
   const [selectedMode, setSelectedMode] = useState<GameMode>("classic");
   const [rolling, setRolling] = useState(false);
+  const [rerollsUsed, setRerollsUsed] = useState(0);
   const [session, setSession] = useState<Session | null>(null);
   const [tab, setTab] = useState<Tab>("notes");
   const [secondsLeft, setSecondsLeft] = useState(3600);
@@ -181,8 +183,9 @@ export default function Home() {
   const topicPageCount = Math.max(1, Math.ceil(filteredTopics.length / TOPICS_PER_PAGE));
   const visibleTopics = filteredTopics.slice(topicPage * TOPICS_PER_PAGE, (topicPage + 1) * TOPICS_PER_PAGE);
 
-  function roll(mode = selectedMode) {
-    if (rolling) return;
+  function roll(mode = selectedMode, countAsReroll = false) {
+    if (rolling || (countAsReroll && rerollsUsed >= MAX_REROLLS)) return;
+    if (countAsReroll) setRerollsUsed((current) => current + 1);
     const pool = mode === "fast" ? topics.filter((candidate) => candidate.difficulty === 1) : topics;
     setRolling(true);
     let ticks = 0;
@@ -195,6 +198,7 @@ export default function Home() {
 
   function chooseMode(mode: GameMode) {
     setSelectedMode(mode);
+    setRerollsUsed(0);
     setScreen("roll");
     window.setTimeout(() => roll(mode), 80);
   }
@@ -396,7 +400,7 @@ export default function Home() {
             <div className="difficulty"><span>DIFFICULTY</span> {"★".repeat(topic.difficulty)}{"☆".repeat(5 - topic.difficulty)}</div>
             {selectedMode === "classic" && <div className="constraint"><small>CHAOS CONSTRAINT</small><strong>{topic.constraint}</strong></div>}
           </article>
-          <div className="roll-actions"><button className="secondary" onClick={() => roll()} disabled={rolling}>↻ REROLL</button><button className="primary" onClick={startSession} disabled={rolling}>GO <span>→</span></button></div>
+          <div className="roll-actions"><button className="secondary" onClick={() => roll(selectedMode, true)} disabled={rolling || rerollsUsed >= MAX_REROLLS}>{rerollsUsed >= MAX_REROLLS ? "REROLLS ÉPUISÉS" : `↻ REROLL · ${MAX_REROLLS - rerollsUsed} RESTANT${MAX_REROLLS - rerollsUsed > 1 ? "S" : ""}`}</button><button className="primary" onClick={startSession} disabled={rolling}>GO <span>→</span></button></div>
           <p className="go-warning">Le chrono de {MODE_CONFIG[selectedMode].durationSeconds / 60} minutes démarre au clic.{selectedMode === "fast" ? " Tirage limité aux sujets ★." : ""}</p>
         </section>
       )}
@@ -411,7 +415,7 @@ export default function Home() {
           <div className="time-progress"><i style={{ width: `${progress}%` }} /></div>
           <div className="work-layout">
             <aside>
-              <div className="aside-label">WORKSPACE</div>
+              <div className="aside-label">TOOLS, NOT CHECKLIST.</div>
               {([['notes','✎','NOTES'],['sources','⌕','SOURCES'],['cards','▱','FLASHCARDS'],['mindmap','⌘','CARTE MENTALE'],['slides','▣','SLIDES']] as const).map(([id, icon, label]) => (
                 <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><b>{icon}</b><span>{label}</span><em>{id === "sources" ? session.sources.length : id === "cards" ? session.cards.length : id === "slides" ? session.slides.length : ""}</em></button>
               ))}
