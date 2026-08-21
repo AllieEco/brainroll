@@ -6,7 +6,7 @@ import { topics, type Topic } from "../data/topics";
 type Source = { id: string; title: string; url: string };
 type Card = { id: string; front: string; back: string };
 type SlideBlock = "title" | "body" | "image";
-type BlockPosition = { x: number; y: number; width: number };
+type BlockPosition = { x: number; y: number; width: number; height?: number; fontSize?: number };
 type Slide = { id: string; title: string; body: string; background?: string; color?: string; image?: string; layout?: "impact" | "canvas"; positions?: Partial<Record<SlideBlock, BlockPosition>> };
 type MindNode = { id: string; text: string; x: number; y: number; color: string };
 type GameMode = "classic" | "fast";
@@ -38,9 +38,11 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const freshSlide = (n = 1): Slide => ({ id: uid(), title: n === 1 ? "Titre de la présentation" : `Slide ${n}`, body: n === 1 ? "Une phrase qui donne envie d’écouter la suite." : "Ajoute ton idée essentielle ici.", background: "#f2efe6", color: "#191815", layout: "impact" });
 const formatTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 const BLOCK_PRESETS: Record<"impact" | "canvas", Record<SlideBlock, BlockPosition>> = {
-  impact: { title: { x: 8, y: 25, width: 78 }, body: { x: 8, y: 58, width: 62 }, image: { x: 63, y: 18, width: 30 } },
-  canvas: { title: { x: 7, y: 23, width: 50 }, body: { x: 7, y: 58, width: 48 }, image: { x: 62, y: 18, width: 31 } },
+  impact: { title: { x: 8, y: 22, width: 78, height: 28, fontSize: 58 }, body: { x: 8, y: 57, width: 62, height: 24, fontSize: 21 }, image: { x: 63, y: 18, width: 30, height: 55 } },
+  canvas: { title: { x: 7, y: 20, width: 50, height: 28, fontSize: 46 }, body: { x: 7, y: 56, width: 48, height: 30, fontSize: 19 }, image: { x: 62, y: 18, width: 31, height: 62 } },
 };
+const TITLE_SIZES = [32, 38, 46, 54, 58, 64, 72, 80, 92];
+const BODY_SIZES = [14, 16, 18, 21, 24, 28, 32, 36, 42];
 const plainText = (value: string) => value.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 function sanitizeRichText(value: string) {
   return value
@@ -183,6 +185,13 @@ export default function Home() {
     updateSession({ slides: session.slides.map((slide, i) => i === slideIndex ? { ...slide, ...patch } : slide) });
   }
 
+  function updateSlideBlock(block: SlideBlock, patch: Partial<BlockPosition>) {
+    if (!session) return;
+    const slide = session.slides[slideIndex];
+    const preset = BLOCK_PRESETS[slide.layout ?? "impact"][block];
+    updateSlide({ positions: { ...slide.positions, [block]: { ...preset, ...slide.positions?.[block], ...patch } } });
+  }
+
   function addSlide() {
     if (!session) return;
     const next = [...session.slides, freshSlide(session.slides.length + 1)];
@@ -223,12 +232,15 @@ export default function Home() {
     return (
       <main className="presentation" style={{ "--topic-accent": session.topic.accent } as React.CSSProperties}>
         <div className="present-top"><span>⚄ BRAINROLL</span><div><ThemeToggle theme={theme} onToggle={toggleTheme} /><span>{presentIndex + 1} / {session.slides.length}</span></div></div>
-        <section className="present-slide freeform-slide" style={{ background: slide.background ?? "#f2efe6", color: slide.color ?? "#191815" }}>
-          <span className="slide-kicker">{session.topic.category} · {session.topic.title}</span>
-          <div className="present-block present-title" style={blockStyle(slide.positions?.title ?? preset.title)} dangerouslySetInnerHTML={{ __html: sanitizeRichText(slide.title) }} />
-          <div className="present-block present-body" style={blockStyle(slide.positions?.body ?? preset.body)} dangerouslySetInnerHTML={{ __html: sanitizeRichText(slide.body) }} />
-          {slide.image && <div className="present-block present-image" style={blockStyle(slide.positions?.image ?? preset.image)}><img src={slide.image} alt="Visuel de la slide" /></div>}
-        </section>
+        <div className="presentation-stage">
+          <section className="slide-surface present-slide freeform-slide" style={{ background: slide.background ?? "#f2efe6", color: slide.color ?? "#191815" }}>
+            <span className="slide-kicker">{session.topic.category} · {session.topic.title}</span>
+            <div className="present-block slide-title-text" style={blockStyle({ ...preset.title, ...slide.positions?.title })} dangerouslySetInnerHTML={{ __html: sanitizeRichText(slide.title) }} />
+            <div className="present-block slide-body-text" style={blockStyle({ ...preset.body, ...slide.positions?.body })} dangerouslySetInnerHTML={{ __html: sanitizeRichText(slide.body) }} />
+            {slide.image && <div className="present-block present-image" style={blockStyle({ ...preset.image, ...slide.positions?.image })}><img src={slide.image} alt="Visuel de la slide" /></div>}
+            <i className="slide-number">{String(presentIndex + 1).padStart(2, "0")}</i>
+          </section>
+        </div>
         <div className="present-controls">
           <button aria-label="Slide précédente" onClick={() => setPresentIndex(Math.max(0, presentIndex - 1))}>←</button>
           <button onClick={() => document.documentElement.requestFullscreen?.()}>PLEIN ÉCRAN</button>
@@ -363,9 +375,11 @@ export default function Home() {
                         <button className="format-button" title="Gras" aria-label="Mettre le texte sélectionné en gras" onMouseDown={(e) => { e.preventDefault(); document.execCommand("bold"); }}><b>B</b></button>
                         <button className="format-button" title="Souligné" aria-label="Souligner le texte sélectionné" onMouseDown={(e) => { e.preventDefault(); document.execCommand("underline"); }}><u>U</u></button>
                         <button className="format-button highlight" title="Surligner" aria-label="Surligner le texte sélectionné" onMouseDown={(e) => { e.preventDefault(); document.execCommand("hiliteColor", false, "#fff176"); }}><mark>A</mark></button>
+                        <label className="font-size-control">TITRE <select aria-label="Taille du titre" value={{ ...BLOCK_PRESETS[session.slides[slideIndex]?.layout ?? "impact"].title, ...session.slides[slideIndex]?.positions?.title }.fontSize} onChange={(e) => updateSlideBlock("title", { fontSize: Number(e.target.value) })}>{TITLE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+                        <label className="font-size-control">TEXTE <select aria-label="Taille du texte" value={{ ...BLOCK_PRESETS[session.slides[slideIndex]?.layout ?? "impact"].body, ...session.slides[slideIndex]?.positions?.body }.fontSize} onChange={(e) => updateSlideBlock("body", { fontSize: Number(e.target.value) })}>{BODY_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
                         <label className="image-upload">+ IMAGE<input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && addImageToSlide(e.target.files[0])} /></label>
                       </div>
-                      <p className="slide-editor-hint">Sélectionne du texte pour le formater · Attrape les poignées pour déplacer les blocs</p>
+                      <p className="slide-editor-hint">Poignée ronde : déplacer · Coin inférieur droit : redimensionner · L’aperçu correspond exactement au mode présentation</p>
                       <SlideCanvas slide={session.slides[slideIndex]} topic={session.topic} index={slideIndex} onChange={updateSlide} />
                       <div className="slide-tools"><button onClick={deleteSlide} disabled={session.slides.length === 1}>SUPPRIMER</button><button onClick={() => { setPresentIndex(0); setScreen("present"); }}>PRÉSENTER ↗</button></div>
                     </div>
@@ -383,55 +397,72 @@ export default function Home() {
 }
 
 function blockStyle(position: BlockPosition): React.CSSProperties {
-  return { left: `${position.x}%`, top: `${position.y}%`, width: `${position.width}%` };
+  return {
+    left: `${position.x}%`,
+    top: `${position.y}%`,
+    width: `${position.width}%`,
+    height: position.height ? `${position.height}%` : undefined,
+    fontSize: position.fontSize ? `${position.fontSize / 9.6}cqw` : undefined,
+  };
 }
 
 function SlideCanvas({ slide, topic, index, onChange }: { slide: Slide; topic: Topic; index: number; onChange: (patch: Partial<Slide>) => void }) {
   const boardRef = useRef<HTMLDivElement>(null);
   const preset = BLOCK_PRESETS[slide.layout ?? "impact"];
-  const [drag, setDrag] = useState<{ block: SlideBlock; startX: number; startY: number; origin: BlockPosition } | null>(null);
-  const positionFor = (block: SlideBlock) => slide.positions?.[block] ?? preset[block];
+  const [interaction, setInteraction] = useState<{ mode: "move" | "resize"; block: SlideBlock; startX: number; startY: number; origin: BlockPosition } | null>(null);
+  const positionFor = (block: SlideBlock) => ({ ...preset[block], ...slide.positions?.[block] });
 
-  function startDrag(event: React.PointerEvent<HTMLButtonElement>, block: SlideBlock) {
+  function startInteraction(event: React.PointerEvent<HTMLButtonElement>, block: SlideBlock, mode: "move" | "resize") {
     if (!boardRef.current) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
-    setDrag({ block, startX: event.clientX, startY: event.clientY, origin: positionFor(block) });
+    setInteraction({ mode, block, startX: event.clientX, startY: event.clientY, origin: positionFor(block) });
   }
 
-  function moveDrag(event: React.PointerEvent<HTMLButtonElement>) {
-    if (!drag || !boardRef.current) return;
+  function moveInteraction(event: React.PointerEvent<HTMLButtonElement>) {
+    if (!interaction || !boardRef.current) return;
     const rect = boardRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(100 - drag.origin.width, drag.origin.x + ((event.clientX - drag.startX) / rect.width) * 100));
-    const y = Math.max(0, Math.min(88, drag.origin.y + ((event.clientY - drag.startY) / rect.height) * 100));
-    onChange({ positions: { ...slide.positions, [drag.block]: { ...drag.origin, x, y } } });
+    const deltaX = ((event.clientX - interaction.startX) / rect.width) * 100;
+    const deltaY = ((event.clientY - interaction.startY) / rect.height) * 100;
+    if (interaction.mode === "move") {
+      const x = Math.max(0, Math.min(100 - interaction.origin.width, interaction.origin.x + deltaX));
+      const y = Math.max(0, Math.min(100 - (interaction.origin.height ?? 12), interaction.origin.y + deltaY));
+      onChange({ positions: { ...slide.positions, [interaction.block]: { ...interaction.origin, x, y } } });
+      return;
+    }
+    const minimumWidth = interaction.block === "image" ? 12 : 18;
+    const minimumHeight = interaction.block === "image" ? 12 : 10;
+    const width = Math.max(minimumWidth, Math.min(100 - interaction.origin.x, interaction.origin.width + deltaX));
+    const height = Math.max(minimumHeight, Math.min(100 - interaction.origin.y, (interaction.origin.height ?? minimumHeight) + deltaY));
+    onChange({ positions: { ...slide.positions, [interaction.block]: { ...interaction.origin, width, height } } });
   }
 
-  const handle = (block: SlideBlock, label: string) => (
-    <button className="block-handle" aria-label={`Déplacer ${label}`} title={`Déplacer ${label}`} onPointerDown={(event) => startDrag(event, block)} onPointerMove={moveDrag} onPointerUp={() => setDrag(null)} onPointerCancel={() => setDrag(null)}>⠿</button>
-  );
+  const handles = (block: SlideBlock, label: string) => <>
+    <button className="block-handle" aria-label={`Déplacer ${label}`} title={`Déplacer ${label}`} onPointerDown={(event) => startInteraction(event, block, "move")} onPointerMove={moveInteraction} onPointerUp={() => setInteraction(null)} onPointerCancel={() => setInteraction(null)}>⠿</button>
+    <button className="resize-handle" aria-label={`Redimensionner ${label}`} title={`Redimensionner ${label}`} onPointerDown={(event) => startInteraction(event, block, "resize")} onPointerMove={moveInteraction} onPointerUp={() => setInteraction(null)} onPointerCancel={() => setInteraction(null)}>↘</button>
+  </>;
 
   return (
-    <div ref={boardRef} className="mini-slide freeform-editor" style={{ background: slide.background, color: slide.color }}>
-      <span className="slide-kicker editor-kicker">{topic.category}</span>
+    <div ref={boardRef} className="slide-surface mini-slide freeform-editor" style={{ background: slide.background, color: slide.color }}>
+      <span className="slide-kicker editor-kicker">{topic.category} · {topic.title}</span>
       <div className="editable-block title-block" style={blockStyle(positionFor("title"))}>
-        {handle("title", "le titre")}
-        <RichTextEditor className="slide-title-editor" label="Titre de la slide" value={slide.title} onChange={(title) => onChange({ title })} />
+        {handles("title", "le titre")}
+        <RichTextEditor className="slide-title-text slide-title-editor" label="Titre de la slide" value={slide.title} onChange={(title) => onChange({ title })} />
       </div>
       <div className="editable-block body-block" style={blockStyle(positionFor("body"))}>
-        {handle("body", "le texte")}
-        <RichTextEditor className="slide-body-editor" label="Contenu de la slide" value={slide.body} onChange={(body) => onChange({ body })} />
+        {handles("body", "le texte")}
+        <RichTextEditor className="slide-body-text slide-body-editor" label="Contenu de la slide" value={slide.body} onChange={(body) => onChange({ body })} />
       </div>
       {slide.image && (
         <div className="editable-block image-block" style={blockStyle(positionFor("image"))}>
-          {handle("image", "l’image")}
+          {handles("image", "l’image")}
           <img src={slide.image} alt="Visuel ajouté" />
           <button className="remove-slide-image" aria-label="Retirer l’image" onClick={() => onChange({ image: undefined })}>×</button>
         </div>
       )}
 
-      <i>{String(index + 1).padStart(2, "0")}</i>
+      <i className="slide-number">{String(index + 1).padStart(2, "0")}</i>
     </div>
   );
 }
