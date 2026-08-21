@@ -385,7 +385,7 @@ export default function Home() {
               {tab === "cards" && (
                 <Panel title="Flashcards" eyebrow="MAKE IT STICK" count={`${session.cards.length} CARDS`}>
                   <div className="card-form"><textarea aria-label="Recto" placeholder="RECTO — Question ou concept" value={cardDraft.front} onChange={(e) => setCardDraft({ ...cardDraft, front: e.target.value })} /><textarea aria-label="Verso" placeholder="VERSO — Réponse" value={cardDraft.back} onChange={(e) => setCardDraft({ ...cardDraft, back: e.target.value })} /><button onClick={addCard}>+ CRÉER LA CARTE</button></div>
-                  <div className="cards-grid">{session.cards.length ? session.cards.map((card, i) => <article className="flashcard" key={card.id}><small>CARD {String(i + 1).padStart(2, "0")}</small><strong>{card.front}</strong><p>{card.back || "Réponse à compléter…"}</p><button onClick={() => updateSession({ cards: session.cards.filter((c) => c.id !== card.id) })}>SUPPRIMER</button></article>) : <Empty text="Transforme les idées importantes en questions." />}</div>
+                  <div className="cards-grid">{session.cards.length ? session.cards.map((card, i) => <Flashcard key={card.id} card={card} index={i} onDelete={() => updateSession({ cards: session.cards.filter((entry) => entry.id !== card.id) })} />) : <Empty text="Transforme les idées importantes en questions." />}</div>
                 </Panel>
               )}
               {tab === "mindmap" && <MindMapPanel session={session} onChange={(mindMap) => updateSession({ mindMap })} onAddToSlide={(image) => { const next = [...session.slides, { ...freshSlide(session.slides.length + 1), title: "Carte mentale", body: "", images: [{ id: uid(), src: image, position: BLOCK_PRESETS.canvas.image }], layout: "canvas" as const }]; updateSession({ slides: next }); setSlideIndex(next.length - 1); setTab("slides"); }} />}
@@ -534,6 +534,29 @@ function Panel({ title, eyebrow, count, children }: { title: string; eyebrow: st
 function NotesPanel({ session, onChange }: { session: Session; onChange: (value: string) => void }) {
   const words = session.notes.trim() ? session.notes.trim().split(/\s+/).length : 0;
   return <Panel title="Notes" eyebrow="CAPTURE THE CHAOS" count={`${words} WORDS`}><div className="note-toolbar"><button onClick={() => onChange(session.notes + "\n# ")}>H1</button><button onClick={() => onChange(session.notes + "\n## ")}>H2</button><button onClick={() => onChange(session.notes + "**texte**")}>B</button><button onClick={() => onChange(session.notes + "\n• ")}>• LIST</button><span>AUTOSAVE ON</span></div><textarea className="notes-area" aria-label="Notes de recherche" placeholder={'Commence à creuser…\n\nNote les idées essentielles, les dates, les noms et les questions qui apparaissent.'} value={session.notes} onChange={(e) => onChange(e.target.value)} /></Panel>;
+}
+
+function Flashcard({ card, index, onDelete }: { card: Card; index: number; onDelete: () => void }) {
+  const [flipped, setFlipped] = useState(false);
+  const number = String(index + 1).padStart(2, "0");
+
+  return <article className={`flashcard ${flipped ? "is-flipped" : ""}`}>
+    <button className="flashcard-flipper" type="button" aria-pressed={flipped} aria-label={`${flipped ? "Afficher le recto" : "Afficher le verso"} de la carte ${number}`} onClick={() => setFlipped((current) => !current)}>
+      <span className="flashcard-inner">
+        <span className="flashcard-face flashcard-front" aria-hidden={flipped}>
+          <span className="flashcard-meta"><small>CARD {number}</small><em>RECTO</em></span>
+          <strong>{card.front}</strong>
+          <span className="flashcard-cue">CLIQUER POUR RETOURNER <b>↻</b></span>
+        </span>
+        <span className="flashcard-face flashcard-back" aria-hidden={!flipped}>
+          <span className="flashcard-meta"><small>CARD {number}</small><em>VERSO</em></span>
+          <p>{card.back || "Réponse à compléter…"}</p>
+          <span className="flashcard-cue">REVOIR LA QUESTION <b>↻</b></span>
+        </span>
+      </span>
+    </button>
+    <button className="flashcard-delete" type="button" aria-label={`Supprimer la carte ${number}`} onClick={onDelete}>×</button>
+  </article>;
 }
 
 function MindMapPanel({ session, onChange, onAddToSlide }: { session: Session; onChange: (nodes: MindNode[]) => void; onAddToSlide: (image: string) => void }) {
