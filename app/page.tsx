@@ -45,6 +45,7 @@ const BLOCK_PRESETS: Record<"impact" | "canvas", Record<SlideBlock | "image", Bl
 };
 const TITLE_SIZES = [32, 38, 46, 54, 58, 64, 72, 80, 92];
 const BODY_SIZES = [14, 16, 18, 21, 24, 28, 32, 36, 42];
+const MINDMAP_WORLD = { minX: -350, minY: -190, width: 1600, height: 900 } as const;
 function resolvedBlockPosition(slide: Slide, block: SlideBlock | "image"): BlockPosition {
   const preset = BLOCK_PRESETS[slide.layout ?? "impact"][block];
   const position = { ...preset, ...slide.positions?.[block] };
@@ -588,7 +589,7 @@ function MindMapPanel({ session, onChange, onAddToSlide }: { session: Session; o
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
 
   useEffect(() => {
-    setZoom(nodes.length > 5 ? Math.max(.55, 1 - (nodes.length - 5) * .055) : 1);
+    setZoom(nodes.length > 5 ? Math.max(.56, 1 - (nodes.length - 5) * .08) : 1);
     setPan({ x: 0, y: 0 });
   }, [nodes.length]);
 
@@ -613,7 +614,7 @@ function MindMapPanel({ session, onChange, onAddToSlide }: { session: Session; o
     const angle = siblings * 1.35 - .7;
     const node: MindNode = index === 0
       ? { id: uid(), text: session.topic.title, x: 450, y: 260, color: session.topic.accent }
-      : { id: uid(), text: "Nouvelle idée", x: Math.max(90, Math.min(810, (parent?.x ?? 450) + Math.cos(angle) * 230)), y: Math.max(65, Math.min(455, (parent?.y ?? 260) + Math.sin(angle) * 150)), color: ["#dfff43", "#55b9ff", "#ff8ec7", "#ffca45"][index % 4], parentId: parent?.id };
+      : { id: uid(), text: "Nouvelle idée", x: Math.max(MINDMAP_WORLD.minX + 90, Math.min(MINDMAP_WORLD.minX + MINDMAP_WORLD.width - 90, (parent?.x ?? 450) + Math.cos(angle) * 230)), y: Math.max(MINDMAP_WORLD.minY + 65, Math.min(MINDMAP_WORLD.minY + MINDMAP_WORLD.height - 65, (parent?.y ?? 260) + Math.sin(angle) * 150)), color: ["#dfff43", "#55b9ff", "#ff8ec7", "#ffca45"][index % 4], parentId: parent?.id };
     onChange([...nodes, node]);
     setSelectedNodeId(node.id);
   }
@@ -640,14 +641,14 @@ function MindMapPanel({ session, onChange, onAddToSlide }: { session: Session; o
     }
     if (!dragging) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const x = Math.max(70, Math.min(830, ((event.clientX - rect.left) / rect.width) * 900));
-    const y = Math.max(45, Math.min(475, ((event.clientY - rect.top) / rect.height) * 520));
+    const x = Math.max(MINDMAP_WORLD.minX + 70, Math.min(MINDMAP_WORLD.minX + MINDMAP_WORLD.width - 70, MINDMAP_WORLD.minX + ((event.clientX - rect.left) / rect.width) * MINDMAP_WORLD.width));
+    const y = Math.max(MINDMAP_WORLD.minY + 45, Math.min(MINDMAP_WORLD.minY + MINDMAP_WORLD.height - 45, MINDMAP_WORLD.minY + ((event.clientY - rect.top) / rect.height) * MINDMAP_WORLD.height));
     onChange(nodes.map((node) => node.id === dragging ? { ...node, x, y } : node));
   }
 
   function renderMap() {
     const canvas = document.createElement("canvas");
-    canvas.width = 1600; canvas.height = 900;
+    canvas.width = MINDMAP_WORLD.width; canvas.height = MINDMAP_WORLD.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return "";
     ctx.fillStyle = "#f2efe6"; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -655,11 +656,11 @@ function MindMapPanel({ session, onChange, onAddToSlide }: { session: Session; o
     for (let x = 0; x < 1600; x += 64) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 900); ctx.stroke(); }
     for (let y = 0; y < 900; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1600, y); ctx.stroke(); }
     const root = nodes[0];
-    nodes.slice(1).forEach((node, index) => { const parent = parentFor(node, index + 1); if (!parent) return; ctx.beginPath(); ctx.strokeStyle = "#191815"; ctx.lineWidth = 5; ctx.moveTo(parent.x * 16 / 9, parent.y * 45 / 26); ctx.lineTo(node.x * 16 / 9, node.y * 45 / 26); ctx.stroke(); });
+    nodes.slice(1).forEach((node, index) => { const parent = parentFor(node, index + 1); if (!parent) return; ctx.beginPath(); ctx.strokeStyle = "#191815"; ctx.lineWidth = 5; ctx.moveTo(parent.x - MINDMAP_WORLD.minX, parent.y - MINDMAP_WORLD.minY); ctx.lineTo(node.x - MINDMAP_WORLD.minX, node.y - MINDMAP_WORLD.minY); ctx.stroke(); });
     nodes.forEach((node) => {
       const rootNode = node.id === root?.id;
       const metrics = mindNodeMetrics(node.text, rootNode);
-      const x = node.x * 16 / 9, y = node.y * 45 / 26, width = metrics.width * 16 / 9, height = metrics.height * 45 / 26;
+      const x = node.x - MINDMAP_WORLD.minX, y = node.y - MINDMAP_WORLD.minY, width = metrics.width, height = metrics.height;
       ctx.fillStyle = node.color; ctx.strokeStyle = "#191815"; ctx.lineWidth = 6;
       ctx.fillRect(x - width / 2, y - height / 2, width, height); ctx.strokeRect(x - width / 2, y - height / 2, width, height);
       ctx.fillStyle = contrastingTextColor(node.color); ctx.font = `900 ${rootNode ? 28 : 22}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -678,11 +679,11 @@ function MindMapPanel({ session, onChange, onAddToSlide }: { session: Session; o
   return <Panel title="Carte mentale" eyebrow="CONNECT THE DOTS" count={`${nodes.length} NODES`}>
     <div className="map-toolbar"><button onClick={addNode}>+ AJOUTER UN NŒUD</button><span>{selectedNode ? <>LIÉ À <strong>{selectedNode.text}</strong></> : "Sélectionne une box pour y rattacher la suivante."}</span><div className="map-zoom" aria-label="Zoom de la carte mentale"><button aria-label="Dézoomer" onClick={() => changeZoom(zoom - .1)}>−</button><button aria-label="Réinitialiser la vue" onClick={resetView}>{Math.round(zoom * 100)}%</button><button aria-label="Zoomer" onClick={() => changeZoom(zoom + .1)}>+</button></div><button onClick={downloadMap} disabled={!nodes.length}>↓ PNG</button><button onClick={() => { const image = renderMap(); if (image) onAddToSlide(image); }} disabled={!nodes.length}>+ AJOUTER AUX SLIDES</button></div>
     <div className={`mindmap-viewport ${panning ? "is-panning" : ""}`} onWheel={(event) => { event.preventDefault(); changeZoom(zoom - event.deltaY * .001); }}>
-      <div className="mindmap-board" style={{ transform: `translate(${pan.x}px,${pan.y}px) scale(${zoom})` }} onPointerDown={(event) => { if (event.target === event.currentTarget) { event.currentTarget.setPointerCapture(event.pointerId); setSelectedNodeId(null); setPanning({ startX: event.clientX, startY: event.clientY, originX: pan.x, originY: pan.y }); } }} onPointerMove={moveNode} onPointerUp={() => { setDragging(null); setPanning(null); }} onPointerCancel={() => { setDragging(null); setPanning(null); }} onPointerLeave={() => { setDragging(null); setPanning(null); }}>
-        <svg viewBox="0 0 900 520" preserveAspectRatio="none" aria-hidden="true">{nodes.slice(1).map((node, index) => { const parent = parentFor(node, index + 1); return parent ? <line key={node.id} x1={parent.x} y1={parent.y} x2={node.x} y2={node.y} /> : null; })}</svg>
+      <div className="mindmap-board" style={{ transform: `translate(-50%,-50%) translate(${pan.x}px,${pan.y}px) scale(${zoom})` }} onPointerDown={(event) => { if (event.target === event.currentTarget) { event.currentTarget.setPointerCapture(event.pointerId); setSelectedNodeId(null); setPanning({ startX: event.clientX, startY: event.clientY, originX: pan.x, originY: pan.y }); } }} onPointerMove={moveNode} onPointerUp={() => { setDragging(null); setPanning(null); }} onPointerCancel={() => { setDragging(null); setPanning(null); }} onPointerLeave={() => { setDragging(null); setPanning(null); }}>
+        <svg viewBox={`${MINDMAP_WORLD.minX} ${MINDMAP_WORLD.minY} ${MINDMAP_WORLD.width} ${MINDMAP_WORLD.height}`} preserveAspectRatio="none" aria-hidden="true">{nodes.slice(1).map((node, index) => { const parent = parentFor(node, index + 1); return parent ? <line key={node.id} x1={parent.x} y1={parent.y} x2={node.x} y2={node.y} /> : null; })}</svg>
         {nodes.map((node, i) => {
           const metrics = mindNodeMetrics(node.text, i === 0);
-          return <article key={node.id} className={`mind-node ${i === 0 ? "root" : ""} ${selectedNodeId === node.id ? "selected" : ""}`} style={{ left: `${node.x / 9}%`, top: `${node.y / 5.2}%`, width: metrics.width, minHeight: metrics.height, background: node.color, color: contrastingTextColor(node.color) }} onFocusCapture={() => setSelectedNodeId(node.id)} onPointerDown={(e) => { setSelectedNodeId(node.id); if (!["INPUT", "TEXTAREA", "BUTTON"].includes((e.target as HTMLElement).tagName)) { e.currentTarget.setPointerCapture(e.pointerId); setDragging(node.id); } }}>
+          return <article key={node.id} className={`mind-node ${i === 0 ? "root" : ""} ${selectedNodeId === node.id ? "selected" : ""}`} style={{ left: `${((node.x - MINDMAP_WORLD.minX) / MINDMAP_WORLD.width) * 100}%`, top: `${((node.y - MINDMAP_WORLD.minY) / MINDMAP_WORLD.height) * 100}%`, width: metrics.width, minHeight: metrics.height, background: node.color, color: contrastingTextColor(node.color) }} onFocusCapture={() => setSelectedNodeId(node.id)} onPointerDown={(e) => { setSelectedNodeId(node.id); if (!["INPUT", "TEXTAREA", "BUTTON"].includes((e.target as HTMLElement).tagName)) { e.currentTarget.setPointerCapture(e.pointerId); setDragging(node.id); } }}>
             <textarea rows={metrics.lineCount} aria-label={`Nœud ${i + 1}`} value={node.text} onChange={(e) => onChange(nodes.map((n) => n.id === node.id ? { ...n, text: e.target.value } : n))} />
             <label aria-label="Couleur du nœud"><input type="color" value={node.color} onChange={(e) => onChange(nodes.map((n) => n.id === node.id ? { ...n, color: e.target.value } : n))} /></label>
             <button aria-label="Supprimer le nœud" onClick={() => deleteNode(node.id)}>×</button>
