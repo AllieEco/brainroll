@@ -89,6 +89,40 @@ function sanitizeRichText(value: string) {
     .replace(/<(b|strong|u|mark|br|div|p)\b[^>]*>/gi, "<$1>");
 }
 
+function escapeHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+function sanitizeNotesHtml(value: string) {
+  return value
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<(?!\/?(?:h1|h2|b|strong|u|mark|br|div|p|ul|ol|li)(?:\s|>|\/))[^>]*>/gi, "")
+    .replace(/<(h1|h2|b|strong|u|mark|br|div|p|ul|ol|li)\b[^>]*>/gi, "<$1>");
+}
+
+function legacyNotesToHtml(value: string) {
+  if (!value) return "";
+  if (/<\/?(?:h1|h2|b|strong|u|mark|br|div|p|ul|ol|li)(?:\s|>)/i.test(value)) return sanitizeNotesHtml(value);
+  const formatInline = (text: string) => escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const output: string[] = [];
+  let listOpen = false;
+  value.split(/\r?\n/).forEach((line) => {
+    const listItem = line.match(/^\s*(?:•|[-*])\s+(.+)/);
+    if (listItem) {
+      if (!listOpen) { output.push("<ul>"); listOpen = true; }
+      output.push(`<li>${formatInline(listItem[1])}</li>`);
+      return;
+    }
+    if (listOpen) { output.push("</ul>"); listOpen = false; }
+    if (/^##\s+/.test(line)) output.push(`<h2>${formatInline(line.replace(/^##\s+/, ""))}</h2>`);
+    else if (/^#\s+/.test(line)) output.push(`<h1>${formatInline(line.replace(/^#\s+/, ""))}</h1>`);
+    else output.push(line ? `<div>${formatInline(line)}</div>` : "<div><br></div>");
+  });
+  if (listOpen) output.push("</ul>");
+  return output.join("");
+}
+
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("home");
   const [topic, setTopic] = useState(topics[0]);
@@ -590,8 +624,32 @@ function Panel({ title, eyebrow, count, children }: { title: string; eyebrow: st
 }
 
 function NotesPanel({ session, onChange }: { session: Session; onChange: (value: string) => void }) {
-  const words = session.notes.trim() ? session.notes.trim().split(/\s+/).length : 0;
-  return <Panel title="Notes" eyebrow="CAPTURE THE CHAOS" count={`${words} WORDS`}><div className="note-toolbar"><button onClick={() => onChange(session.notes + "\n# ")}>H1</button><button onClick={() => onChange(session.notes + "\n## ")}>H2</button><button onClick={() => onChange(session.notes + "**texte**")}>B</button><button onClick={() => onChange(session.notes + "\n• ")}>• LIST</button><span>AUTOSAVE ON</span></div><textarea className="notes-area" aria-label="Notes de recherche" placeholder={'Commence à creuser…\n\nNote les idées essentielles, les dates, les noms et les questions qui apparaissent.'} value={session.notes} onChange={(e) => onChange(e.target.value)} /></Panel>;
+  const editorRef = useRef<HTMLDivElement>(null);
+  const lastEmittedRef = useRef<string | null>(null);
+  const words = plainText(legacyNotesToHtml(session.notes)).split(/\s+/).filter(Boolean).length;
+
+  useEffect(() => {
+    if (!editorRef.current || session.notes === lastEmittedRef.current) return;
+    editorRef.current.innerHTML = legacyNotesToHtml(session.notes);
+  }, [session.notes]);
+
+  function format(command: "formatBlock" | "bold" | "insertUnorderedList", value?: string) {
+    editorRef.current?.focus();
+    document.execCommand(command, false, value);
+    if (!editorRef.current) return;
+    const next = sanitizeNotesHtml(editorRef.current.innerHTML);
+    lastEmittedRef.current = next;
+    onChange(next);
+  }
+
+  function saveEditor() {
+    if (!editorRef.current) return;
+    const next = sanitizeNotesHtml(editorRef.current.innerHTML);
+    lastEmittedRef.current = next;
+    onChange(next);
+  }
+
+  return <Panel title="Notes" eyebrow="CAPTURE THE CHAOS" count={`${words} WORDS`}><div className="note-toolbar"><button onMouseDown={(event) => { event.preventDefault(); format("formatBlock", "h1"); }}>H1</button><button onMouseDown={(event) => { event.preventDefault(); format("formatBlock", "h2"); }}>H2</button><button aria-label="Mettre en gras" onMouseDown={(event) => { event.preventDefault(); format("bold"); }}>B</button><button onMouseDown={(event) => { event.preventDefault(); format("insertUnorderedList"); }}>• LIST</button><span>AUTOSAVE ON</span></div><div ref={editorRef} className="notes-area" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label="Notes de recherche" data-placeholder={'Commence à creuser…\n\nNote les idées essentielles, les dates, les noms et les questions qui apparaissent.'} onInput={saveEditor} onBlur={saveEditor} onPaste={(event) => { event.preventDefault(); document.execCommand("insertText", false, event.clipboardData.getData("text/plain")); }} /></Panel>;
 }
 
 function Flashcard({ card, index, onDelete }: { card: Card; index: number; onDelete: () => void }) {
