@@ -5,9 +5,11 @@ import { topics, type Topic } from "../data/topics";
 
 type Source = { id: string; title: string; url: string };
 type Card = { id: string; front: string; back: string };
-type SlideBlock = "title" | "body" | "image";
+type SlideBlock = "title" | "body";
 type BlockPosition = { x: number; y: number; width: number; height?: number; fontSize?: number };
-type Slide = { id: string; title: string; body: string; background?: string; color?: string; image?: string; layout?: "impact" | "canvas"; positions?: Partial<Record<SlideBlock, BlockPosition>> };
+type SlideImage = { id: string; src: string; position: BlockPosition };
+type SlideTarget = { kind: "block"; block: SlideBlock } | { kind: "image"; id: string };
+type Slide = { id: string; title: string; body: string; background?: string; color?: string; image?: string; images?: SlideImage[]; layout?: "impact" | "canvas"; positions?: Partial<Record<SlideBlock | "image", BlockPosition>> };
 type MindNode = { id: string; text: string; x: number; y: number; color: string };
 type GameMode = "classic" | "fast";
 type ThemeMode = "light" | "dark";
@@ -37,18 +39,22 @@ const MODE_CONFIG = {
 const uid = () => Math.random().toString(36).slice(2, 9);
 const freshSlide = (n = 1): Slide => ({ id: uid(), title: n === 1 ? "Titre de la présentation" : `Slide ${n}`, body: n === 1 ? "Une phrase qui donne envie d’écouter la suite." : "Ajoute ton idée essentielle ici.", background: "#f2efe6", color: "#191815", layout: "impact" });
 const formatTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-const BLOCK_PRESETS: Record<"impact" | "canvas", Record<SlideBlock, BlockPosition>> = {
+const BLOCK_PRESETS: Record<"impact" | "canvas", Record<SlideBlock | "image", BlockPosition>> = {
   impact: { title: { x: 8, y: 22, width: 78, height: 20, fontSize: 58 }, body: { x: 8, y: 57, width: 62, height: 17, fontSize: 21 }, image: { x: 63, y: 18, width: 30, height: 55 } },
   canvas: { title: { x: 7, y: 20, width: 50, height: 21, fontSize: 46 }, body: { x: 7, y: 56, width: 48, height: 24, fontSize: 19 }, image: { x: 62, y: 18, width: 31, height: 62 } },
 };
 const TITLE_SIZES = [32, 38, 46, 54, 58, 64, 72, 80, 92];
 const BODY_SIZES = [14, 16, 18, 21, 24, 28, 32, 36, 42];
-function resolvedBlockPosition(slide: Slide, block: SlideBlock): BlockPosition {
+function resolvedBlockPosition(slide: Slide, block: SlideBlock | "image"): BlockPosition {
   const preset = BLOCK_PRESETS[slide.layout ?? "impact"][block];
   const position = { ...preset, ...slide.positions?.[block] };
   if (block === "title" && position.height === 28) position.height = preset.height;
   if (block === "body" && (position.height === 24 || position.height === 30)) position.height = preset.height;
   return position;
+}
+function slideImages(slide: Slide): SlideImage[] {
+  if (slide.images?.length) return slide.images;
+  return slide.image ? [{ id: "legacy-image", src: slide.image, position: resolvedBlockPosition(slide, "image") }] : [];
 }
 const plainText = (value: string) => value.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 function sanitizeRichText(value: string) {
@@ -229,8 +235,23 @@ export default function Home() {
   function addImageToSlide(file: File) {
     if (!file.type.startsWith("image/") || file.size > 2_500_000) return;
     const currentSlide = session?.slides[slideIndex];
+    if (!currentSlide) return;
     const reader = new FileReader();
-    reader.onload = () => updateSlide({ image: String(reader.result), layout: "canvas", positions: currentSlide?.layout === "canvas" ? currentSlide.positions : BLOCK_PRESETS.canvas });
+    reader.onload = () => {
+      const existingImages = slideImages(currentSlide);
+      const offset = existingImages.length % 6;
+      const position: BlockPosition = {
+        ...BLOCK_PRESETS.canvas.image,
+        x: Math.min(68, 58 + offset * 2),
+        y: Math.min(42, 14 + offset * 5),
+      };
+      updateSlide({
+        image: undefined,
+        images: [...existingImages, { id: uid(), src: String(reader.result), position }],
+        layout: "canvas",
+        positions: currentSlide.layout === "canvas" ? currentSlide.positions : BLOCK_PRESETS.canvas,
+      });
+    };
     reader.readAsDataURL(file);
   }
 
@@ -244,7 +265,7 @@ export default function Home() {
             <span className="slide-kicker">{session.topic.category} · {session.topic.title}</span>
             <div className="present-block slide-title-text" style={blockStyle(resolvedBlockPosition(slide, "title"))} dangerouslySetInnerHTML={{ __html: sanitizeRichText(slide.title) }} />
             <div className="present-block slide-body-text" style={blockStyle(resolvedBlockPosition(slide, "body"))} dangerouslySetInnerHTML={{ __html: sanitizeRichText(slide.body) }} />
-            {slide.image && <div className="present-block present-image" style={blockStyle(resolvedBlockPosition(slide, "image"))}><img src={slide.image} alt="Visuel de la slide" /></div>}
+            {slideImages(slide).map((image, imageIndex) => <div key={image.id} className="present-block present-image" style={blockStyle(image.position)}><img src={image.src} alt={`Visuel ${imageIndex + 1} de la slide`} /></div>)}
             <i className="slide-number">{String(presentIndex + 1).padStart(2, "0")}</i>
           </section>
         </div>
@@ -367,7 +388,7 @@ export default function Home() {
                   <div className="cards-grid">{session.cards.length ? session.cards.map((card, i) => <article className="flashcard" key={card.id}><small>CARD {String(i + 1).padStart(2, "0")}</small><strong>{card.front}</strong><p>{card.back || "Réponse à compléter…"}</p><button onClick={() => updateSession({ cards: session.cards.filter((c) => c.id !== card.id) })}>SUPPRIMER</button></article>) : <Empty text="Transforme les idées importantes en questions." />}</div>
                 </Panel>
               )}
-              {tab === "mindmap" && <MindMapPanel session={session} onChange={(mindMap) => updateSession({ mindMap })} onAddToSlide={(image) => { const next = [...session.slides, { ...freshSlide(session.slides.length + 1), title: "Carte mentale", body: "", image, layout: "canvas" as const }]; updateSession({ slides: next }); setSlideIndex(next.length - 1); setTab("slides"); }} />}
+              {tab === "mindmap" && <MindMapPanel session={session} onChange={(mindMap) => updateSession({ mindMap })} onAddToSlide={(image) => { const next = [...session.slides, { ...freshSlide(session.slides.length + 1), title: "Carte mentale", body: "", images: [{ id: uid(), src: image, position: BLOCK_PRESETS.canvas.image }], layout: "canvas" as const }]; updateSession({ slides: next }); setSlideIndex(next.length - 1); setTab("slides"); }} />}
               {tab === "slides" && (
                 <Panel title="Slides" eyebrow="BUILD THE STORY" count={`${session.slides.length} SLIDES`}>
                   <div className="slides-editor">
@@ -384,9 +405,9 @@ export default function Home() {
                         <button className="format-button highlight" title="Surligner" aria-label="Surligner le texte sélectionné" onMouseDown={(e) => { e.preventDefault(); document.execCommand("hiliteColor", false, "#fff176"); }}><mark>A</mark></button>
                         <label className="font-size-control">TITRE <select aria-label="Taille du titre" value={{ ...BLOCK_PRESETS[session.slides[slideIndex]?.layout ?? "impact"].title, ...session.slides[slideIndex]?.positions?.title }.fontSize} onChange={(e) => updateSlideBlock("title", { fontSize: Number(e.target.value) })}>{TITLE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
                         <label className="font-size-control">TEXTE <select aria-label="Taille du texte" value={{ ...BLOCK_PRESETS[session.slides[slideIndex]?.layout ?? "impact"].body, ...session.slides[slideIndex]?.positions?.body }.fontSize} onChange={(e) => updateSlideBlock("body", { fontSize: Number(e.target.value) })}>{BODY_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
-                        <label className="image-upload">+ IMAGE<input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && addImageToSlide(e.target.files[0])} /></label>
+                        <label className="image-upload">+ IMAGE<input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) addImageToSlide(file); e.target.value = ""; }} /></label>
                       </div>
-                      <p className="slide-editor-hint">Poignée ronde : déplacer · Coin inférieur droit : redimensionner · L’aperçu correspond exactement au mode présentation</p>
+                      <p className="slide-editor-hint">Chaque import ajoute une image · Poignée ronde : déplacer · Coin inférieur droit : redimensionner · L’aperçu correspond exactement au mode présentation</p>
                       <SlideCanvas slide={session.slides[slideIndex]} topic={session.topic} index={slideIndex} onChange={updateSlide} />
                       <div className="slide-tools"><button onClick={deleteSlide} disabled={session.slides.length === 1}>SUPPRIMER</button><button onClick={() => { setPresentIndex(0); setScreen("present"); }}>PRÉSENTER ↗</button></div>
                     </div>
@@ -415,15 +436,23 @@ function blockStyle(position: BlockPosition): React.CSSProperties {
 
 function SlideCanvas({ slide, topic, index, onChange }: { slide: Slide; topic: Topic; index: number; onChange: (patch: Partial<Slide>) => void }) {
   const boardRef = useRef<HTMLDivElement>(null);
-  const [interaction, setInteraction] = useState<{ mode: "move" | "resize"; block: SlideBlock; startX: number; startY: number; origin: BlockPosition } | null>(null);
+  const [interaction, setInteraction] = useState<{ mode: "move" | "resize"; target: SlideTarget; startX: number; startY: number; origin: BlockPosition } | null>(null);
   const positionFor = (block: SlideBlock) => resolvedBlockPosition(slide, block);
 
-  function startInteraction(event: React.PointerEvent<HTMLButtonElement>, block: SlideBlock, mode: "move" | "resize") {
+  function startInteraction(event: React.PointerEvent<HTMLButtonElement>, target: SlideTarget, mode: "move" | "resize", origin: BlockPosition) {
     if (!boardRef.current) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
-    setInteraction({ mode, block, startX: event.clientX, startY: event.clientY, origin: positionFor(block) });
+    setInteraction({ mode, target, startX: event.clientX, startY: event.clientY, origin });
+  }
+
+  function updateTargetPosition(target: SlideTarget, position: BlockPosition) {
+    if (target.kind === "block") {
+      onChange({ positions: { ...slide.positions, [target.block]: position } });
+      return;
+    }
+    onChange({ image: undefined, images: slideImages(slide).map((image) => image.id === target.id ? { ...image, position } : image) });
   }
 
   function moveInteraction(event: React.PointerEvent<HTMLButtonElement>) {
@@ -434,39 +463,39 @@ function SlideCanvas({ slide, topic, index, onChange }: { slide: Slide; topic: T
     if (interaction.mode === "move") {
       const x = Math.max(0, Math.min(100 - interaction.origin.width, interaction.origin.x + deltaX));
       const y = Math.max(0, Math.min(100 - (interaction.origin.height ?? 12), interaction.origin.y + deltaY));
-      onChange({ positions: { ...slide.positions, [interaction.block]: { ...interaction.origin, x, y } } });
+      updateTargetPosition(interaction.target, { ...interaction.origin, x, y });
       return;
     }
-    const minimumWidth = interaction.block === "image" ? 12 : 18;
-    const minimumHeight = interaction.block === "image" ? 12 : 10;
+    const minimumWidth = interaction.target.kind === "image" ? 12 : 18;
+    const minimumHeight = interaction.target.kind === "image" ? 12 : 10;
     const width = Math.max(minimumWidth, Math.min(100 - interaction.origin.x, interaction.origin.width + deltaX));
     const height = Math.max(minimumHeight, Math.min(100 - interaction.origin.y, (interaction.origin.height ?? minimumHeight) + deltaY));
-    onChange({ positions: { ...slide.positions, [interaction.block]: { ...interaction.origin, width, height } } });
+    updateTargetPosition(interaction.target, { ...interaction.origin, width, height });
   }
 
-  const handles = (block: SlideBlock, label: string) => <>
-    <button className="block-handle" aria-label={`Déplacer ${label}`} title={`Déplacer ${label}`} onPointerDown={(event) => startInteraction(event, block, "move")} onPointerMove={moveInteraction} onPointerUp={() => setInteraction(null)} onPointerCancel={() => setInteraction(null)}>⠿</button>
-    <button className="resize-handle" aria-label={`Redimensionner ${label}`} title={`Redimensionner ${label}`} onPointerDown={(event) => startInteraction(event, block, "resize")} onPointerMove={moveInteraction} onPointerUp={() => setInteraction(null)} onPointerCancel={() => setInteraction(null)}></button>
+  const handles = (target: SlideTarget, position: BlockPosition, label: string) => <>
+    <button className="block-handle" aria-label={`Déplacer ${label}`} title={`Déplacer ${label}`} onPointerDown={(event) => startInteraction(event, target, "move", position)} onPointerMove={moveInteraction} onPointerUp={() => setInteraction(null)} onPointerCancel={() => setInteraction(null)}>⠿</button>
+    <button className="resize-handle" aria-label={`Redimensionner ${label}`} title={`Redimensionner ${label}`} onPointerDown={(event) => startInteraction(event, target, "resize", position)} onPointerMove={moveInteraction} onPointerUp={() => setInteraction(null)} onPointerCancel={() => setInteraction(null)}></button>
   </>;
 
   return (
     <div ref={boardRef} className="slide-surface mini-slide freeform-editor" style={{ background: slide.background, color: slide.color }}>
       <span className="slide-kicker editor-kicker">{topic.category} · {topic.title}</span>
       <div className="editable-block title-block" style={blockStyle(positionFor("title"))}>
-        {handles("title", "le titre")}
+        {handles({ kind: "block", block: "title" }, positionFor("title"), "le titre")}
         <RichTextEditor className="slide-title-text slide-title-editor" label="Titre de la slide" value={slide.title} onChange={(title) => onChange({ title })} />
       </div>
       <div className="editable-block body-block" style={blockStyle(positionFor("body"))}>
-        {handles("body", "le texte")}
+        {handles({ kind: "block", block: "body" }, positionFor("body"), "le texte")}
         <RichTextEditor className="slide-body-text slide-body-editor" label="Contenu de la slide" value={slide.body} onChange={(body) => onChange({ body })} />
       </div>
-      {slide.image && (
-        <div className="editable-block image-block" style={blockStyle(positionFor("image"))}>
-          {handles("image", "l’image")}
-          <img src={slide.image} alt="Visuel ajouté" />
-          <button className="remove-slide-image" aria-label="Retirer l’image" onClick={() => onChange({ image: undefined })}>×</button>
+      {slideImages(slide).map((image, imageIndex) => (
+        <div key={image.id} className="editable-block image-block" style={blockStyle(image.position)}>
+          {handles({ kind: "image", id: image.id }, image.position, `l’image ${imageIndex + 1}`)}
+          <img src={image.src} alt={`Visuel ajouté ${imageIndex + 1}`} />
+          <button className="remove-slide-image" aria-label={`Retirer l’image ${imageIndex + 1}`} onClick={() => onChange({ image: undefined, images: slideImages(slide).filter((entry) => entry.id !== image.id) })}>×</button>
         </div>
-      )}
+      ))}
 
       <i className="slide-number">{String(index + 1).padStart(2, "0")}</i>
     </div>
