@@ -13,6 +13,7 @@ type Slide = { id: string; title: string; body: string; background?: string; col
 type MindNode = { id: string; text: string; x: number; y: number; color: string; parentId?: string };
 type GameMode = "classic" | "fast";
 type ThemeMode = "light" | "dark";
+type CountdownStep = 3 | 2 | 1 | "GO!";
 type Session = {
   topic: Topic;
   mode: GameMode;
@@ -104,6 +105,7 @@ export default function Home() {
   const [selectedThemes, setSelectedThemes] = useState<string[]>(TOPIC_THEMES);
   const [topicDifficulty, setTopicDifficulty] = useState<number | "all">("all");
   const [theme, setTheme] = useState<ThemeMode>("light");
+  const [countdownStep, setCountdownStep] = useState<CountdownStep | null>(null);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem(THEME_KEY);
@@ -156,6 +158,22 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [screen, session?.locked, session?.slides.length]);
 
+  useEffect(() => {
+    if (countdownStep === null) return;
+    const nextStep: Record<CountdownStep, CountdownStep | null> = { 3: 2, 2: 1, 1: "GO!", "GO!": null };
+    const delay = countdownStep === "GO!" ? 850 : 700;
+    const timer = window.setTimeout(() => {
+      const next = nextStep[countdownStep];
+      if (next === null) {
+        launchSession();
+        setCountdownStep(null);
+      } else {
+        setCountdownStep(next);
+      }
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [countdownStep]);
+
   const progress = useMemo(() => session ? Math.max(0, Math.min(100, (secondsLeft / session.durationSeconds) * 100)) : 100, [secondsLeft, session]);
   const filteredTopics = useMemo(() => {
     return topics.filter((entry) => selectedThemes.includes(entry.category) && (topicDifficulty === "all" || entry.difficulty === topicDifficulty));
@@ -189,6 +207,11 @@ export default function Home() {
   }
 
   function startSession() {
+    if (rolling || countdownStep !== null) return;
+    setCountdownStep(3);
+  }
+
+  function launchSession() {
     const durationSeconds = MODE_CONFIG[selectedMode].durationSeconds;
     const next: Session = { topic, mode: selectedMode, durationSeconds, endsAt: Date.now() + durationSeconds * 1000, notes: "", sources: [], cards: [], slides: [freshSlide()], mindMap: [], locked: false };
     setSession(next);
@@ -439,6 +462,17 @@ export default function Home() {
         </section>
       )}
       {screen !== "workspace" && <footer><span>LESS BRAINROT. MORE BRAIN.</span><span>{selectedMode === "fast" ? "30:00 · FAST MODE · ★" : "60:00 · CLASSIC MODE"}</span></footer>}
+      {countdownStep !== null && (
+        <section className={`race-countdown ${countdownStep === "GO!" ? "is-go" : ""}`} role="alert" aria-live="assertive" aria-label={countdownStep === "GO!" ? "Départ" : `Départ dans ${countdownStep}`}>
+          <div className="race-speed-lines" aria-hidden="true" />
+          <div className="race-countdown-content">
+            <span className="race-kicker">BRAINROLL RACE CONTROL</span>
+            <strong key={countdownStep} className="race-countdown-number">{countdownStep}</strong>
+            <p>{countdownStep === "GO!" ? "THE CLOCK IS RUNNING" : `${MODE_CONFIG[selectedMode].label} MODE · GET READY`}</p>
+            <div className="race-lights" aria-hidden="true"><i className="active" /><i className={countdownStep !== 3 ? "active" : ""} /><i className={countdownStep === 1 || countdownStep === "GO!" ? "active" : ""} /></div>
+          </div>
+        </section>
+      )}
       {confirmAbandon && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="abandon-title"><div className="confirm-modal"><span>⚠ DANGER ZONE</span><h2 id="abandon-title">Abandonner la partie ?</h2><p>Le chrono s’arrêtera et toutes les notes, sources, cartes et slides de cette session seront supprimées.</p><div><button className="secondary" onClick={() => setConfirmAbandon(false)}>CONTINUER LA PARTIE</button><button className="danger" onClick={abandonSession}>OUI, ABANDONNER</button></div></div></div>}
     </main>
   );
