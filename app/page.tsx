@@ -10,7 +10,7 @@ type BlockPosition = { x: number; y: number; width: number; height?: number; fon
 type SlideImage = { id: string; src: string; position: BlockPosition };
 type SlideTarget = { kind: "block"; block: SlideBlock } | { kind: "image"; id: string };
 type Slide = { id: string; title: string; body: string; background?: string; color?: string; image?: string; images?: SlideImage[]; layout?: "impact" | "canvas"; positions?: Partial<Record<SlideBlock | "image", BlockPosition>> };
-type MindNode = { id: string; text: string; x: number; y: number; color: string };
+type MindNode = { id: string; text: string; x: number; y: number; color: string; parentId?: string };
 type GameMode = "classic" | "fast";
 type ThemeMode = "light" | "dark";
 type Session = {
@@ -581,17 +581,63 @@ function Flashcard({ card, index, onDelete }: { card: Card; index: number; onDel
 function MindMapPanel({ session, onChange, onAddToSlide }: { session: Session; onChange: (nodes: MindNode[]) => void; onAddToSlide: (image: string) => void }) {
   const nodes = session.mindMap ?? [];
   const [dragging, setDragging] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [panning, setPanning] = useState<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+  const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+
+  useEffect(() => {
+    setZoom(nodes.length > 5 ? Math.max(.55, 1 - (nodes.length - 5) * .055) : 1);
+    setPan({ x: 0, y: 0 });
+  }, [nodes.length]);
+
+  function changeZoom(next: number) {
+    setZoom(Math.max(.45, Math.min(1.5, next)));
+  }
+
+  function resetView() {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }
+
+  function parentFor(node: MindNode, index: number) {
+    if (index === 0) return undefined;
+    return nodes.find((candidate) => candidate.id === node.parentId && candidate.id !== node.id) ?? nodes[0];
+  }
 
   function addNode() {
     const index = nodes.length;
-    const angle = Math.max(0, index - 1) * 1.65;
+    const parent = selectedNode ?? nodes[0];
+    const siblings = parent ? nodes.filter((node) => (node.parentId ?? nodes[0]?.id) === parent.id).length : 0;
+    const angle = siblings * 1.35 - .7;
     const node: MindNode = index === 0
       ? { id: uid(), text: session.topic.title, x: 450, y: 260, color: session.topic.accent }
-      : { id: uid(), text: "Nouvelle idée", x: 450 + Math.cos(angle) * 270, y: 260 + Math.sin(angle) * 175, color: ["#dfff43", "#55b9ff", "#ff8ec7", "#ffca45"][index % 4] };
+      : { id: uid(), text: "Nouvelle idée", x: Math.max(90, Math.min(810, (parent?.x ?? 450) + Math.cos(angle) * 230)), y: Math.max(65, Math.min(455, (parent?.y ?? 260) + Math.sin(angle) * 150)), color: ["#dfff43", "#55b9ff", "#ff8ec7", "#ffca45"][index % 4], parentId: parent?.id };
     onChange([...nodes, node]);
+    setSelectedNodeId(node.id);
+  }
+
+  function deleteNode(nodeId: string) {
+    const removedIndex = nodes.findIndex((node) => node.id === nodeId);
+    const removed = nodes[removedIndex];
+    if (!removed) return;
+    const remaining = nodes.filter((node) => node.id !== nodeId);
+    const nextRoot = remaining[0];
+    const fallbackParentId = removedIndex === 0 ? nextRoot?.id : removed.parentId ?? nodes[0]?.id;
+    const next = remaining.map((node, index) => {
+      if (index === 0) return { ...node, parentId: undefined };
+      return node.parentId === nodeId || !node.parentId ? { ...node, parentId: fallbackParentId } : node;
+    });
+    onChange(next);
+    if (selectedNodeId === nodeId) setSelectedNodeId(fallbackParentId ?? null);
   }
 
   function moveNode(event: React.PointerEvent<HTMLDivElement>) {
+    if (panning) {
+      setPan({ x: panning.originX + event.clientX - panning.startX, y: panning.originY + event.clientY - panning.startY });
+      return;
+    }
     if (!dragging) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const x = Math.max(70, Math.min(830, ((event.clientX - rect.left) / rect.width) * 900));
@@ -609,7 +655,7 @@ function MindMapPanel({ session, onChange, onAddToSlide }: { session: Session; o
     for (let x = 0; x < 1600; x += 64) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 900); ctx.stroke(); }
     for (let y = 0; y < 900; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1600, y); ctx.stroke(); }
     const root = nodes[0];
-    if (root) nodes.slice(1).forEach((node) => { ctx.beginPath(); ctx.strokeStyle = "#191815"; ctx.lineWidth = 5; ctx.moveTo(root.x * 16 / 9, root.y * 45 / 26); ctx.lineTo(node.x * 16 / 9, node.y * 45 / 26); ctx.stroke(); });
+    nodes.slice(1).forEach((node, index) => { const parent = parentFor(node, index + 1); if (!parent) return; ctx.beginPath(); ctx.strokeStyle = "#191815"; ctx.lineWidth = 5; ctx.moveTo(parent.x * 16 / 9, parent.y * 45 / 26); ctx.lineTo(node.x * 16 / 9, node.y * 45 / 26); ctx.stroke(); });
     nodes.forEach((node) => {
       const rootNode = node.id === root?.id;
       const metrics = mindNodeMetrics(node.text, rootNode);
@@ -630,18 +676,20 @@ function MindMapPanel({ session, onChange, onAddToSlide }: { session: Session; o
   }
 
   return <Panel title="Carte mentale" eyebrow="CONNECT THE DOTS" count={`${nodes.length} NODES`}>
-    <div className="map-toolbar"><button onClick={addNode}>+ AJOUTER UN NŒUD</button><span>Glisse les cartes pour organiser tes idées.</span><button onClick={downloadMap} disabled={!nodes.length}>↓ PNG</button><button onClick={() => { const image = renderMap(); if (image) onAddToSlide(image); }} disabled={!nodes.length}>+ AJOUTER AUX SLIDES</button></div>
-    <div className="mindmap-board" onPointerMove={moveNode} onPointerUp={() => setDragging(null)} onPointerLeave={() => setDragging(null)}>
-      <svg viewBox="0 0 900 520" preserveAspectRatio="none" aria-hidden="true">{nodes[0] && nodes.slice(1).map((node) => <line key={node.id} x1={nodes[0].x} y1={nodes[0].y} x2={node.x} y2={node.y} />)}</svg>
-      {nodes.map((node, i) => {
-        const metrics = mindNodeMetrics(node.text, i === 0);
-        return <article key={node.id} className={`mind-node ${i === 0 ? "root" : ""}`} style={{ left: `${node.x / 9}%`, top: `${node.y / 5.2}%`, width: metrics.width, minHeight: metrics.height, background: node.color, color: contrastingTextColor(node.color) }} onPointerDown={(e) => { if (!["INPUT", "TEXTAREA", "BUTTON"].includes((e.target as HTMLElement).tagName)) { e.currentTarget.setPointerCapture(e.pointerId); setDragging(node.id); } }}>
-          <textarea rows={metrics.lineCount} aria-label={`Nœud ${i + 1}`} value={node.text} onChange={(e) => onChange(nodes.map((n) => n.id === node.id ? { ...n, text: e.target.value } : n))} />
-          <label aria-label="Couleur du nœud"><input type="color" value={node.color} onChange={(e) => onChange(nodes.map((n) => n.id === node.id ? { ...n, color: e.target.value } : n))} /></label>
-          <button aria-label="Supprimer le nœud" onClick={() => onChange(nodes.filter((n) => n.id !== node.id))}>×</button>
-        </article>;
-      })}
-      {!nodes.length && <div className="map-empty"><span>⌘</span><strong>COMMENCE PAR LE SUJET CENTRAL</strong><button onClick={addNode}>CRÉER LA CARTE</button></div>}
+    <div className="map-toolbar"><button onClick={addNode}>+ AJOUTER UN NŒUD</button><span>{selectedNode ? <>LIÉ À <strong>{selectedNode.text}</strong></> : "Sélectionne une box pour y rattacher la suivante."}</span><div className="map-zoom" aria-label="Zoom de la carte mentale"><button aria-label="Dézoomer" onClick={() => changeZoom(zoom - .1)}>−</button><button aria-label="Réinitialiser la vue" onClick={resetView}>{Math.round(zoom * 100)}%</button><button aria-label="Zoomer" onClick={() => changeZoom(zoom + .1)}>+</button></div><button onClick={downloadMap} disabled={!nodes.length}>↓ PNG</button><button onClick={() => { const image = renderMap(); if (image) onAddToSlide(image); }} disabled={!nodes.length}>+ AJOUTER AUX SLIDES</button></div>
+    <div className={`mindmap-viewport ${panning ? "is-panning" : ""}`} onWheel={(event) => { event.preventDefault(); changeZoom(zoom - event.deltaY * .001); }}>
+      <div className="mindmap-board" style={{ transform: `translate(${pan.x}px,${pan.y}px) scale(${zoom})` }} onPointerDown={(event) => { if (event.target === event.currentTarget) { event.currentTarget.setPointerCapture(event.pointerId); setSelectedNodeId(null); setPanning({ startX: event.clientX, startY: event.clientY, originX: pan.x, originY: pan.y }); } }} onPointerMove={moveNode} onPointerUp={() => { setDragging(null); setPanning(null); }} onPointerCancel={() => { setDragging(null); setPanning(null); }} onPointerLeave={() => { setDragging(null); setPanning(null); }}>
+        <svg viewBox="0 0 900 520" preserveAspectRatio="none" aria-hidden="true">{nodes.slice(1).map((node, index) => { const parent = parentFor(node, index + 1); return parent ? <line key={node.id} x1={parent.x} y1={parent.y} x2={node.x} y2={node.y} /> : null; })}</svg>
+        {nodes.map((node, i) => {
+          const metrics = mindNodeMetrics(node.text, i === 0);
+          return <article key={node.id} className={`mind-node ${i === 0 ? "root" : ""} ${selectedNodeId === node.id ? "selected" : ""}`} style={{ left: `${node.x / 9}%`, top: `${node.y / 5.2}%`, width: metrics.width, minHeight: metrics.height, background: node.color, color: contrastingTextColor(node.color) }} onFocusCapture={() => setSelectedNodeId(node.id)} onPointerDown={(e) => { setSelectedNodeId(node.id); if (!["INPUT", "TEXTAREA", "BUTTON"].includes((e.target as HTMLElement).tagName)) { e.currentTarget.setPointerCapture(e.pointerId); setDragging(node.id); } }}>
+            <textarea rows={metrics.lineCount} aria-label={`Nœud ${i + 1}`} value={node.text} onChange={(e) => onChange(nodes.map((n) => n.id === node.id ? { ...n, text: e.target.value } : n))} />
+            <label aria-label="Couleur du nœud"><input type="color" value={node.color} onChange={(e) => onChange(nodes.map((n) => n.id === node.id ? { ...n, color: e.target.value } : n))} /></label>
+            <button aria-label="Supprimer le nœud" onClick={() => deleteNode(node.id)}>×</button>
+          </article>;
+        })}
+        {!nodes.length && <div className="map-empty"><span>⌘</span><strong>COMMENCE PAR LE SUJET CENTRAL</strong><button onClick={addNode}>CRÉER LA CARTE</button></div>}
+      </div>
     </div>
   </Panel>;
 }
