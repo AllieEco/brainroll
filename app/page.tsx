@@ -499,7 +499,7 @@ export default function Home() {
           </div>
         </section>
       )}
-      {screen !== "workspace" && <footer><span>LESS BRAINROT. MORE BRAIN.</span><span>{selectedMode === "fast" ? "30:00 · FAST MODE · ★" : "60:00 · CLASSIC MODE"}</span></footer>}
+      {screen !== "workspace" && <footer><span>LESS BRAINROT. MORE BRAIN.</span><span>{selectedMode === "fast" ? "30:00 · FAST MODE · ★" : "60:00 · CLASSIC MODE"}</span><a className="creator-link" href="https://github.com/AllieEco" target="_blank" rel="noreferrer" aria-label="Profil GitHub de AllieEco"><span className="github-mark"><img className="github-mark-light" src="/github-invertocat.png" alt="" aria-hidden="true" /><img className="github-mark-dark" src="/github-invertocat-white.png" alt="" aria-hidden="true" /></span><span>Made with &lt;3 by <strong>AllieEco</strong></span></a></footer>}
       {countdownStep !== null && (
         <section className={`race-countdown ${countdownStep === "GO!" ? "is-go" : ""}`} role="alert" aria-live="assertive" aria-label={countdownStep === "GO!" ? "Départ" : `Départ dans ${countdownStep}`}>
           <div className="race-speed-lines" aria-hidden="true" />
