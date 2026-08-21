@@ -56,6 +56,25 @@ function slideImages(slide: Slide): SlideImage[] {
   if (slide.images?.length) return slide.images;
   return slide.image ? [{ id: "legacy-image", src: slide.image, position: resolvedBlockPosition(slide, "image") }] : [];
 }
+function contrastingTextColor(background: string) {
+  const value = background.replace("#", "");
+  const hex = value.length === 3 ? value.split("").map((character) => character + character).join("") : value;
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return "#191815";
+  const red = parseInt(hex.slice(0, 2), 16);
+  const green = parseInt(hex.slice(2, 4), 16);
+  const blue = parseInt(hex.slice(4, 6), 16);
+  return (red * 299 + green * 587 + blue * 114) / 1000 > 128 ? "#191815" : "#fffdf7";
+}
+function mindNodeMetrics(text: string, root: boolean) {
+  const minimumWidth = root ? 210 : 154;
+  const maximumWidth = root ? 330 : 280;
+  const minimumHeight = root ? 90 : 72;
+  const longestParagraph = Math.max(1, ...text.split("\n").map((line) => line.length));
+  const width = Math.min(maximumWidth, Math.max(minimumWidth, 104 + Math.min(longestParagraph, 34) * 5.2));
+  const charactersPerLine = Math.max(10, Math.floor((width - 50) / 8));
+  const lineCount = Math.max(1, text.split("\n").reduce((count, line) => count + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0));
+  return { width, height: Math.max(minimumHeight, 48 + lineCount * 22), lineCount };
+}
 const plainText = (value: string) => value.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 function sanitizeRichText(value: string) {
   return value
@@ -592,13 +611,15 @@ function MindMapPanel({ session, onChange, onAddToSlide }: { session: Session; o
     const root = nodes[0];
     if (root) nodes.slice(1).forEach((node) => { ctx.beginPath(); ctx.strokeStyle = "#191815"; ctx.lineWidth = 5; ctx.moveTo(root.x * 16 / 9, root.y * 45 / 26); ctx.lineTo(node.x * 16 / 9, node.y * 45 / 26); ctx.stroke(); });
     nodes.forEach((node) => {
-      const x = node.x * 16 / 9, y = node.y * 45 / 26, width = node.id === root?.id ? 330 : 250, height = node.id === root?.id ? 115 : 90;
+      const rootNode = node.id === root?.id;
+      const metrics = mindNodeMetrics(node.text, rootNode);
+      const x = node.x * 16 / 9, y = node.y * 45 / 26, width = metrics.width * 16 / 9, height = metrics.height * 45 / 26;
       ctx.fillStyle = node.color; ctx.strokeStyle = "#191815"; ctx.lineWidth = 6;
       ctx.fillRect(x - width / 2, y - height / 2, width, height); ctx.strokeRect(x - width / 2, y - height / 2, width, height);
-      ctx.fillStyle = "#191815"; ctx.font = `900 ${node.id === root?.id ? 28 : 22}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = contrastingTextColor(node.color); ctx.font = `900 ${rootNode ? 28 : 22}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const words = node.text.split(" "); let line = ""; const lines: string[] = [];
       words.forEach((word) => { const test = `${line} ${word}`.trim(); if (ctx.measureText(test).width > width - 28 && line) { lines.push(line); line = word; } else line = test; }); lines.push(line);
-      lines.slice(0, 3).forEach((text, i) => ctx.fillText(text, x, y + (i - (lines.length - 1) / 2) * 26));
+      lines.forEach((text, i) => ctx.fillText(text, x, y + (i - (lines.length - 1) / 2) * 28));
     });
     return canvas.toDataURL("image/png");
   }
@@ -612,11 +633,14 @@ function MindMapPanel({ session, onChange, onAddToSlide }: { session: Session; o
     <div className="map-toolbar"><button onClick={addNode}>+ AJOUTER UN NŒUD</button><span>Glisse les cartes pour organiser tes idées.</span><button onClick={downloadMap} disabled={!nodes.length}>↓ PNG</button><button onClick={() => { const image = renderMap(); if (image) onAddToSlide(image); }} disabled={!nodes.length}>+ AJOUTER AUX SLIDES</button></div>
     <div className="mindmap-board" onPointerMove={moveNode} onPointerUp={() => setDragging(null)} onPointerLeave={() => setDragging(null)}>
       <svg viewBox="0 0 900 520" preserveAspectRatio="none" aria-hidden="true">{nodes[0] && nodes.slice(1).map((node) => <line key={node.id} x1={nodes[0].x} y1={nodes[0].y} x2={node.x} y2={node.y} />)}</svg>
-      {nodes.map((node, i) => <article key={node.id} className={`mind-node ${i === 0 ? "root" : ""}`} style={{ left: `${node.x / 9}%`, top: `${node.y / 5.2}%`, background: node.color }} onPointerDown={(e) => { if ((e.target as HTMLElement).tagName !== "INPUT" && (e.target as HTMLElement).tagName !== "BUTTON") { e.currentTarget.setPointerCapture(e.pointerId); setDragging(node.id); } }}>
-        <input aria-label={`Nœud ${i + 1}`} value={node.text} onChange={(e) => onChange(nodes.map((n) => n.id === node.id ? { ...n, text: e.target.value } : n))} />
-        <label aria-label="Couleur du nœud"><input type="color" value={node.color} onChange={(e) => onChange(nodes.map((n) => n.id === node.id ? { ...n, color: e.target.value } : n))} /></label>
-        <button aria-label="Supprimer le nœud" onClick={() => onChange(nodes.filter((n) => n.id !== node.id))}>×</button>
-      </article>)}
+      {nodes.map((node, i) => {
+        const metrics = mindNodeMetrics(node.text, i === 0);
+        return <article key={node.id} className={`mind-node ${i === 0 ? "root" : ""}`} style={{ left: `${node.x / 9}%`, top: `${node.y / 5.2}%`, width: metrics.width, minHeight: metrics.height, background: node.color, color: contrastingTextColor(node.color) }} onPointerDown={(e) => { if (!["INPUT", "TEXTAREA", "BUTTON"].includes((e.target as HTMLElement).tagName)) { e.currentTarget.setPointerCapture(e.pointerId); setDragging(node.id); } }}>
+          <textarea rows={metrics.lineCount} aria-label={`Nœud ${i + 1}`} value={node.text} onChange={(e) => onChange(nodes.map((n) => n.id === node.id ? { ...n, text: e.target.value } : n))} />
+          <label aria-label="Couleur du nœud"><input type="color" value={node.color} onChange={(e) => onChange(nodes.map((n) => n.id === node.id ? { ...n, color: e.target.value } : n))} /></label>
+          <button aria-label="Supprimer le nœud" onClick={() => onChange(nodes.filter((n) => n.id !== node.id))}>×</button>
+        </article>;
+      })}
       {!nodes.length && <div className="map-empty"><span>⌘</span><strong>COMMENCE PAR LE SUJET CENTRAL</strong><button onClick={addNode}>CRÉER LA CARTE</button></div>}
     </div>
   </Panel>;
